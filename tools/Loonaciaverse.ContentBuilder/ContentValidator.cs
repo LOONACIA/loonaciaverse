@@ -53,6 +53,14 @@ public sealed class ContentValidator
         }
     }
 
+    public void ValidateCover(string sourcePath, string sourceDir, string? cover)
+    {
+        if (ContentAssets.IsRelativeUrl(cover) && !ContentAssets.FileExists(sourceDir, cover!))
+        {
+            errors.Add($"{sourcePath}: cover '{cover}' must reference an existing file in the content folder.");
+        }
+    }
+
     public void ValidateDates(string sourcePath, DateTime? date, DateTime? updated)
     {
         if (date is null)

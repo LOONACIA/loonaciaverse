@@ -44,6 +44,7 @@ public class PostBuilderTests
 
             <iframe src="https://example.com/embed"></iframe>
             """);
+        File.WriteAllBytes(Path.Combine(contentDir, "posts", "alpha", "cover.png"), [1, 2, 3]);
 
         var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, true));
 
@@ -52,7 +53,8 @@ public class PostBuilderTests
         var indexJson = File.ReadAllText(Path.Combine(outputDir, "content", "posts.json"));
         var posts = JsonSerializer.Deserialize<PostSummary[]>(indexJson, ContentJson.Options)!;
         Assert.Equal(new[] { firstSlug, secondSlug }, posts.Select(post => post.Slug));
-        var expectedAlpha = new PostSummary("alpha", "첫 번째 글", DateOnly.ParseExact(alphaDate, "yyyy-MM-dd"), new DateOnly(2026, 10, 27), "첫 번째 글의 요약입니다.", ["blazor", "dotnet"], true, "cover.png");
+        var expectedAlpha = new PostSummary(
+            "alpha", "첫 번째 글", DateOnly.ParseExact(alphaDate, "yyyy-MM-dd"), new DateOnly(2026, 10, 27), "첫 번째 글의 요약입니다.", ["blazor", "dotnet"], true, "/content/posts/alpha/cover.png");
         var expectedBeta = new PostSummary("beta", "두 번째 글", new DateOnly(2026, 10, 26), null, "두 번째 글의 요약입니다.", ["threejs"], false, null);
         AssertSummary(expectedAlpha, posts.Single(post => post.Slug == "alpha"));
         AssertSummary(expectedBeta, posts.Single(post => post.Slug == "beta"));
@@ -80,6 +82,7 @@ public class PostBuilderTests
         var roundTrippedDetail = JsonSerializer.Deserialize<PostDetail>(JsonSerializer.Serialize(alphaDetail, ContentJson.Options), ContentJson.Options)!;
         AssertSummary(alphaDetail.Meta, roundTrippedDetail.Meta);
         Assert.Equal(alphaDetail.Html, roundTrippedDetail.Html);
+        Assert.Equal(alphaDetail.Toc, roundTrippedDetail.Toc);
     }
 
     [Theory]

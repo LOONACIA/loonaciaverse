@@ -11,6 +11,8 @@ tags: [blazor, threejs]
 Loonaciaverse는 프로젝트와 개발 기록을 모아 두는 작은 우주입니다.
 Blazor와 Three.js로 새로운 경험을 만들어 가는 과정을 이곳에 남깁니다.
 
+![orbit](orbit.svg)
+
 ## 함께 만들어 갈 이야기
 
 작은 시도부터 완성된 프로젝트까지, 배운 내용을 차근차근 공유하겠습니다.
