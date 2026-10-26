@@ -9,6 +9,8 @@ description: Claude plans and reviews, Codex implements. Use for multi-step impl
 
 스크립트: 저장소 루트에서 `uv run .claude/skills/harness/scripts/harness.py <subcommand>`. 모든 서브커맨드는 JSON 객체 하나를 출력합니다. 종료 코드 2는 전제 조건이 실패해 아무 일도 일어나지 않았다는 뜻이니 `error`를 읽으세요.
 
+커밋하는 서브커맨드(`start`, `commit`, `replan`)에는 시스템 리마인더가 알려주는 git 커밋 attribution 줄을 한 줄씩 `--trailer`로 넘깁니다(예: `--trailer "Co-Authored-By: ..." --trailer "Claude-Session: ..."`). 스크립트는 모델 이름과 세션을 모릅니다. `Harness-Plan`과 Codex 트레일러는 스크립트가 직접 붙이니 넘기지 마세요.
+
 ## 모드
 
 사용자의 말에서 모드를 고릅니다.
@@ -48,7 +50,7 @@ Codex는 매 스텝을 계획 대화를 전혀 모르는 새 세션에서 시작
 - **시그니처 수준의 지시.** 파일, 함수, 클래스와 그 시그니처를 명시합니다. 본문은 Codex에게 맡기되, 굽히면 안 되는 규칙(멱등성, 인증 검사, 데이터 무결성, 트랜잭션)은 명시적으로 적습니다.
 - **이유가 붙은 금지.** "X를 조심하라"가 아니라 "X를 하지 마라. 이유: Y"로 씁니다. 예: "새 ORM 모델을 추가하지 마라. 이유: 공용 모델은 스텝 s3에서 도입하며 이 스텝과 충돌하면 안 된다."
 - **대화를 참조하지 않기.** "논의한 대로", "합의한 것처럼"이라고 쓰지 마세요. 그 정보를 description에 직접 넣습니다.
-- **한국어로 쓰기.** `goal`, `description`, 재시도 피드백처럼 Codex에게 전달하는 글은 한국어로 씁니다(Codex도 `summary`, `decisions`, `blockers`를 한국어로 돌려줍니다). 파일 경로, 식별자, 명령은 원래 표기 그대로 둡니다. `title`은 커밋 메시지(`harness(<plan-id>): <step-id> - <title>`)에 들어가므로 저장소의 커밋 메시지 언어를 따릅니다.
+- **한국어로 쓰기.** `goal`, `description`, 재시도 피드백처럼 Codex에게 전달하는 글은 한국어로 씁니다(Codex도 `summary`, `decisions`, `blockers`를 한국어로 돌려줍니다). 파일 경로, 식별자, 명령은 원래 표기 그대로 둡니다. `type`, `scope`(선택), `title`은 커밋 제목 `<type>(<scope>): <title>`(예: `feat(api): add CSV export endpoint`)이 되므로 저장소의 커밋 관례와 언어를 따릅니다.
 
 #### plan.yaml 스키마
 
@@ -61,7 +63,9 @@ max_attempts: 3                # 선택, 기본 3 (첫 실행 + 재시도 2회)
 ac_timeout_sec: 600            # 선택, AC 명령 하나당
 steps:
   - id: s1-export-endpoint
-    title: Export endpoint returns CSV for the happy path
+    title: add CSV export endpoint for the happy path
+    type: feat
+    scope: api                 # 선택
     description: |
       먼저 읽을 파일: docs/ARCHITECTURE.md ("API layer" 절), src/api/users.py (에러 처리 패턴).
 

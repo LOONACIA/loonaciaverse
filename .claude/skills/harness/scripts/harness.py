@@ -8,12 +8,12 @@ Deterministic part of the harness. Claude Code (the orchestrator) calls the
 subcommands below; every judgment call (review, retry prompt, commit/discard)
 stays with Claude.
 
-    uv run .claude/skills/harness/scripts/harness.py start <plan-id>
+    uv run .claude/skills/harness/scripts/harness.py start <plan-id> [--trailer T ...]
     uv run .claude/skills/harness/scripts/harness.py status
     uv run .claude/skills/harness/scripts/harness.py run <step-id> [--feedback-file F] [--force]
-    uv run .claude/skills/harness/scripts/harness.py commit <step-id>
+    uv run .claude/skills/harness/scripts/harness.py commit <step-id> [--trailer T ...]
     uv run .claude/skills/harness/scripts/harness.py discard <step-id>
-    uv run .claude/skills/harness/scripts/harness.py replan
+    uv run .claude/skills/harness/scripts/harness.py replan [--trailer T ...]
 
 Plans and run state live in .harness/plans/ at the repository root.
 
@@ -50,6 +50,8 @@ DEFAULT_MAX_ATTEMPTS = 3
 DEFAULT_STEP_TIMEOUT_SEC = 30 * 60
 DEFAULT_AC_TIMEOUT_SEC = 10 * 60
 TAIL_CHARS = 4000
+# Codex implements every step, so step commits always credit it.
+CODEX_TRAILER = "Co-Authored-By: Codex <noreply@openai.com>"
 
 OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -135,6 +137,10 @@ def git(*args: str, check: bool = True, env: dict[str, str] | None = None) -> st
 
 def current_branch() -> str:
     return git("rev-parse", "--abbrev-ref", "HEAD").strip()
+
+
+def git_commit(plan_id: str, subject: str, trailers: list[str]) -> None:
+    git("commit", "-q", "-m", "\n".join([subject, "", f"Harness-Plan: {plan_id}", *trailers]))
 
 
 def changed_paths() -> list[str]:
@@ -234,7 +240,7 @@ def validate_plan(plan: Any, plan_id: str) -> None:
         if sid in seen:
             raise HarnessError(f"duplicate step id {sid!r}")
         seen.add(sid)
-        for key in ("title", "description"):
+        for key in ("title", "description", "type"):
             if not isinstance(step.get(key), str) or not step[key].strip():
                 raise HarnessError(f"step {sid!r} needs a non-empty '{key}'")
         files = step.get("expected_files")
@@ -366,7 +372,7 @@ def cmd_start(args: argparse.Namespace) -> dict[str, Any]:
     base = git("rev-parse", "HEAD").strip()
     git("checkout", "-q", "-b", branch)
     git("add", "--", plan_rel)
-    git("commit", "-q", "-m", f"harness({plan_id}): add plan")
+    git_commit(plan_id, f"chore(harness): add {plan_id} plan", args.trailer)
 
     state = {
         "plan_id": plan_id,
@@ -684,7 +690,8 @@ def cmd_commit(args: argparse.Namespace) -> dict[str, Any]:
         raise HarnessError("nothing to commit: working tree is clean")
 
     git("add", "-A")
-    git("commit", "-q", "-m", f"harness({plan_id}): {step['id']} - {step['title']}")
+    scope = f"({step['scope']})" if step.get("scope") else ""
+    git_commit(plan_id, f"{step['type']}{scope}: {step['title']}", [CODEX_TRAILER, *args.trailer])
     sha = git("rev-parse", "--short", "HEAD").strip()
 
     summary = None
@@ -766,7 +773,7 @@ def cmd_replan(args: argparse.Namespace) -> dict[str, Any]:
         state["steps"].setdefault(sid, new_step_state())
 
     git("add", "--", plan_rel)
-    git("commit", "-q", "-m", f"harness({plan_id}): replan")
+    git_commit(plan_id, f"chore(harness): revise {plan_id} plan", args.trailer)
     save_state(plan_id, state)
     return {
         "action": "replan",
@@ -786,8 +793,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="harness", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
 
+    trailer_help = "commit message trailer line, e.g. Co-Authored-By (repeatable)"
+
     p = sub.add_parser("start", help="create the plan branch, commit plan.yaml, initialise state")
     p.add_argument("plan_id")
+    p.add_argument("--trailer", action="append", default=[], help=trailer_help)
     p.set_defaults(func=cmd_start)
 
     for name in ("status", "resume"):
@@ -805,6 +815,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("commit", help="commit the reviewed step")
     p.add_argument("step_id")
     p.add_argument("--plan")
+    p.add_argument("--trailer", action="append", default=[], help=trailer_help)
     p.set_defaults(func=cmd_commit)
 
     p = sub.add_parser("discard", help="throw away the uncommitted changes of a step")
@@ -814,6 +825,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("replan", help="commit an approved plan.yaml change made mid-run")
     p.add_argument("--plan")
+    p.add_argument("--trailer", action="append", default=[], help=trailer_help)
     p.set_defaults(func=cmd_replan)
     return parser
 
