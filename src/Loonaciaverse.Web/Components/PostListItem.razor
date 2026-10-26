@@ -1,0 +1,22 @@
+<article class="post-list-item">
+    <div class="post-meta">
+        <time datetime="@Formatting.FormatDate(Post.Date)">@Formatting.FormatDate(Post.Date)</time>
+        @if (Post.Draft)
+        {
+            <span class="badge badge-draft">DRAFT</span>
+        }
+    </div>
+    <h2><a href="/blog/@Post.Slug">@Post.Title</a></h2>
+    <p class="post-summary">@Post.Summary</p>
+    <ul class="post-tags">
+        @foreach (var tag in Post.Tags)
+        {
+            <li><a class="chip" href="/blog/tags/@Uri.EscapeDataString(tag)">@tag</a></li>
+        }
+    </ul>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public PostSummary Post { get; set; } = default!;
+}

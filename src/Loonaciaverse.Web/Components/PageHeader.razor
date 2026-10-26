@@ -1,5 +1,9 @@
 <header class="page-header">
-    @if (Universe?.Bodies.FirstOrDefault(body => body.Id == BodyId) is { } body)
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <div class="hud-label">@Label</div>
+    }
+    else if (Universe?.Bodies.FirstOrDefault(body => body.Id == BodyId) is { } body)
     {
         <div class="hud-label">@body.Name</div>
     }
@@ -13,6 +17,9 @@
 
     [Parameter, EditorRequired]
     public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Label { get; set; }
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }

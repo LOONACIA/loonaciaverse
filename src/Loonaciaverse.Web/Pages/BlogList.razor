@@ -1,0 +1,57 @@
+@page "/blog"
+@page "/blog/tags/{Tag}"
+@layout PageLayout
+@inject IContentService ContentService
+
+<PageTitle>@(Tag is null ? "BLOG · LOONACIAVERSE" : $"{Tag} · BLOG · LOONACIAVERSE")</PageTitle>
+
+<ContentLoader @key="Tag" TItem="IReadOnlyList<PostSummary>" Load="async cancellationToken => await ContentService.GetPostsAsync(cancellationToken)" Context="posts">
+    @if (Tag is null)
+    {
+        var tags = posts.SelectMany(post => post.Tags.Distinct(StringComparer.Ordinal))
+            .GroupBy(tag => tag, StringComparer.Ordinal)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.Ordinal);
+        <section class="blog-page">
+            <PageHeader BodyId="blog" Title="BLOG" />
+            <ul class="blog-tags" aria-label="태그">
+                @foreach (var tag in tags)
+                {
+                    <li><a class="chip" href="/blog/tags/@Uri.EscapeDataString(tag.Key)">@tag.Key</a></li>
+                }
+            </ul>
+            @foreach (var post in posts)
+            {
+                <PostListItem Post="post" />
+            }
+            @if (posts.Count == 0)
+            {
+                <p class="blog-empty">아직 기록된 글이 없습니다.</p>
+            }
+        </section>
+    }
+    else
+    {
+        var taggedPosts = posts.Where(post => post.Tags.Contains(Tag, StringComparer.Ordinal)).ToArray();
+        @if (taggedPosts.Length == 0)
+        {
+            <LostInSpace />
+        }
+        else
+        {
+            <section class="blog-page">
+                <PageHeader BodyId="blog" Label="TAG" Title="@Tag" />
+                <a class="all-posts" href="/blog">전체 글</a>
+                @foreach (var post in taggedPosts)
+                {
+                    <PostListItem Post="post" />
+                }
+            </section>
+        }
+    }
+</ContentLoader>
+
+@code {
+    [Parameter]
+    public string? Tag { get; set; }
+}
