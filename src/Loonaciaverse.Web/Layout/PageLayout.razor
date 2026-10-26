@@ -1,8 +1,35 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject IContentService ContentService
 
 <div class="page-layout">
     <TopBar />
     <main>
-        @Body
+        <CascadingValue Value="universe">
+            @Body
+        </CascadingValue>
     </main>
 </div>
+
+@code {
+    private readonly CancellationTokenSource cancellation = new();
+    private Universe? universe;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            universe = await ContentService.GetUniverseAsync(cancellation.Token);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            universe = null;
+        }
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

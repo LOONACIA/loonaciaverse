@@ -142,6 +142,107 @@ a {
     color: var(--color-hud);
 }
 
+.prose {
+    max-width: 72ch;
+    font-family: var(--font-body);
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+}
+
+.prose h2,
+.prose h3 {
+    margin: 2em 0 0.75em;
+    font-family: var(--font-body);
+    line-height: 1.35;
+}
+
+.prose h2 {
+    font-size: 1.75rem;
+}
+
+.prose h3 {
+    font-size: 1.35rem;
+}
+
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose table,
+.prose pre {
+    margin: 0 0 1.5rem;
+}
+
+.prose ul,
+.prose ol {
+    padding-left: 1.5rem;
+}
+
+.prose li + li {
+    margin-top: 0.5rem;
+}
+
+.prose blockquote {
+    padding: 0.75rem 1.25rem;
+    border-left: 2px solid var(--color-hud);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+}
+
+.prose blockquote > :last-child {
+    margin-bottom: 0;
+}
+
+.prose table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+}
+
+.prose th,
+.prose td {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-hud-dim);
+    text-align: left;
+}
+
+.prose th {
+    background: var(--color-surface);
+}
+
+.prose code {
+    padding: 0.15em 0.35em;
+    border-radius: 0.2rem;
+    background: var(--color-surface);
+    font-family: ui-monospace, monospace;
+    font-size: 0.9em;
+}
+
+.prose pre {
+    padding: 1.25rem;
+    overflow-x: auto;
+    background: var(--color-surface);
+    line-height: 1.6;
+}
+
+.prose pre code {
+    padding: 0;
+    background: transparent;
+}
+
+.prose img {
+    max-width: 100%;
+    height: auto;
+}
+
+.prose iframe {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border: none;
+}
+
 #blazor-error-ui {
     display: none;
     position: fixed;

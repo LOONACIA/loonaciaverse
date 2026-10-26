@@ -1,0 +1,33 @@
+@page "/about"
+@layout PageLayout
+@inject IContentService ContentService
+
+<PageTitle>ABOUT · LOONACIAVERSE</PageTitle>
+
+<ContentLoader TItem="AboutProfile" Load="async cancellationToken => await ContentService.GetAboutAsync(cancellationToken)" Context="profile">
+    <article class="about-page">
+        <PageHeader BodyId="about" Title="@profile.Name" />
+        <p class="about-title">@profile.Title</p>
+        <ul class="about-stack">
+            @foreach (var stack in profile.Stack)
+            {
+                <li class="chip">@stack</li>
+            }
+        </ul>
+        <ContentBody Html="@profile.Html" />
+        <section class="comms" aria-labelledby="comms-heading">
+            <h2 id="comms-heading" class="hud-label">COMMS</h2>
+            <ul>
+                <li><a href="mailto:@profile.Email">EMAIL</a></li>
+                @if (profile.Github is not null)
+                {
+                    <li><a href="@profile.Github" target="_blank" rel="noopener noreferrer">GITHUB</a></li>
+                }
+                @if (profile.Linkedin is not null)
+                {
+                    <li><a href="@profile.Linkedin" target="_blank" rel="noopener noreferrer">LINKEDIN</a></li>
+                }
+            </ul>
+        </section>
+    </article>
+</ContentLoader>

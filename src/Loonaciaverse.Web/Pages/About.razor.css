@@ -1,0 +1,41 @@
+.about-page {
+    max-width: 72ch;
+    margin-inline: auto;
+    font-family: var(--font-body);
+}
+
+.about-title {
+    margin: 0 0 1rem;
+    color: var(--color-text-muted);
+    font-size: 1.25rem;
+}
+
+.about-stack,
+.comms ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0;
+    list-style: none;
+}
+
+.about-stack {
+    margin: 0 0 2.5rem;
+}
+
+.comms {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-hud-dim);
+}
+
+.comms h2 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.comms a {
+    font-family: var(--font-hud);
+    letter-spacing: 0.12em;
+}

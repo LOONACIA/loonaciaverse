@@ -1,0 +1,6 @@
+<div class="prose">@((MarkupString)Html)</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Html { get; set; } = string.Empty;
+}

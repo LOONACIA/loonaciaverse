@@ -1,0 +1,35 @@
+@typeparam TItem where TItem : class
+@implements IDisposable
+
+@if (loading)
+{
+    <div class="content-loading" aria-busy="true"></div>
+}
+else if (item is not null)
+{
+    @ChildContent(item)
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public Func<CancellationToken, Task<TItem?>> Load { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<TItem> ChildContent { get; set; } = default!;
+
+    private readonly CancellationTokenSource cancellation = new();
+    private bool loading = true;
+    private TItem? item;
+
+    protected override async Task OnInitializedAsync()
+    {
+        item = await Load(cancellation.Token);
+        loading = false;
+    }
+
+    public void Dispose()
+    {
+        cancellation.Cancel();
+        cancellation.Dispose();
+    }
+}

@@ -29,6 +29,7 @@ public class NotFoundTests
     {
         using var context = new BunitContext();
         context.JSInterop.Setup<string>("Blazor._internal.PageTitle.getAndRemoveExistingTitle").SetResult(string.Empty);
+        context.Services.AddSingleton<Loonaciaverse.Core.Content.IContentService>(new FakeContentService());
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(path);
         var head = context.Render<HeadOutlet>();
 

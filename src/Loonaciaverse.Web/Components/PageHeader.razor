@@ -1,0 +1,22 @@
+<header class="page-header">
+    @if (Universe?.Bodies.FirstOrDefault(body => body.Id == BodyId) is { } body)
+    {
+        <div class="hud-label">@body.Name</div>
+    }
+    <h1>@Title</h1>
+    @ChildContent
+</header>
+
+@code {
+    [Parameter, EditorRequired]
+    public string BodyId { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [CascadingParameter]
+    public Universe? Universe { get; set; }
+}
