@@ -21,8 +21,23 @@ public class BodyInfoTests
         var component = RenderBody(context, body, universe.Stats);
 
         Assert.Equal(body.Name, component.Find("h2").TextContent);
+        Assert.Equal("-1", component.Find("h2").GetAttribute("tabindex"));
         Assert.Equal(body.Subtitle, component.Find("header .hud-label").TextContent);
         Assert.Equal(body.Tagline, component.Find(".body-tagline").TextContent);
+    }
+
+    [Fact]
+    public async Task FocusHeadingMovesFocusToTheBodyNameWithoutScrolling()
+    {
+        using var context = new BunitContext();
+        var universe = TestContent.Universe();
+        var component = RenderBody(context, universe.Bodies[0], universe.Stats);
+
+        await component.InvokeAsync(() => component.Instance.FocusHeadingAsync().AsTask());
+
+        var invocation = context.JSInterop.VerifyFocusAsyncInvoke();
+        invocation.Arguments[0].ShouldBeElementReferenceTo(component.Find("h2"));
+        Assert.Equal(true, invocation.Arguments[1]);
     }
 
     [Fact]

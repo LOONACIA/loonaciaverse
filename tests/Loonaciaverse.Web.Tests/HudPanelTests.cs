@@ -34,6 +34,20 @@ public class HudPanelTests
     }
 
     [Fact]
+    public async Task FocusHeadingDelegatesToTheBodyInfoHeadingWithoutScrolling()
+    {
+        using var context = new BunitContext();
+        var universe = TestContent.Universe();
+        var component = context.Render<HudPanel>(parameters => parameters.Add(p => p.Body, universe.Bodies[2]).Add(p => p.Stats, universe.Stats));
+
+        await component.InvokeAsync(() => component.Instance.FocusHeadingAsync().AsTask());
+
+        var invocation = context.JSInterop.VerifyFocusAsyncInvoke();
+        invocation.Arguments[0].ShouldBeElementReferenceTo(component.Find("h2"));
+        Assert.Equal(true, invocation.Arguments[1]);
+    }
+
+    [Fact]
     public void CloseButtonRaisesOnClose()
     {
         using var context = new BunitContext();

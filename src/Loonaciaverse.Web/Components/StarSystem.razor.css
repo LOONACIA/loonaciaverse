@@ -1,3 +1,7 @@
+.star-system:focus {
+    outline: none;
+}
+
 .scene-host {
     position: fixed;
     inset: 0;

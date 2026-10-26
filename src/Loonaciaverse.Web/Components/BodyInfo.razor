@@ -1,6 +1,6 @@
 <div class="body-info">
     <header>
-        <h2>@Body.Name</h2>
+        <h2 tabindex="-1" @ref="heading">@Body.Name</h2>
         <p class="hud-label body-subtitle">@Body.Subtitle</p>
         <p class="body-tagline">@Body.Tagline</p>
     </header>
@@ -131,4 +131,8 @@
 
     [Parameter, EditorRequired]
     public HudStats Stats { get; set; } = default!;
+
+    private ElementReference heading;
+
+    public ValueTask FocusHeadingAsync() => heading.FocusAsync(preventScroll: true);
 }

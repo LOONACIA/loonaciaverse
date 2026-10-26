@@ -54,6 +54,8 @@ public sealed class SceneInterop(IJSRuntime js) : IAsyncDisposable
 
     public Task ClearFocusAsync() => InvokeSceneAsync("clearFocus");
 
+    public Task HighlightAsync(string? bodyId) => InvokeSceneAsync("highlight", bodyId);
+
     private async Task InvokeSceneAsync(string identifier, params object?[] arguments)
     {
         if (disposed || !initialized)

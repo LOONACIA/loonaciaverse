@@ -2,7 +2,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
 
-<div class="star-system @(state == SceneState.Unavailable ? "list-fallback" : "")">
+<div class="star-system @(state == SceneState.Unavailable ? "list-fallback" : "")" tabindex="-1" @onkeydown="OnKeyDownAsync" @ref="root">
     @if (state != SceneState.Unavailable)
     {
         <div class="scene-host" @ref="host"></div>
@@ -12,9 +12,16 @@
             <h1>@Universe.Site.Title</h1>
             <p class="hud-label">SELECT DESTINATION</p>
         </header>
-        @if (state == SceneState.Ready && FocusedBody is { } body)
+        @if (state == SceneState.Ready)
         {
-            <HudPanel Body="body" Stats="Universe.Stats" OnClose="CloseAsync" />
+            @foreach (var body in Universe.Bodies)
+            {
+                <button class="visually-hidden" type="button" @key="body.Id" @onfocus="() => HighlightAsync(body.Id)" @onblur="() => HighlightAsync(null)" @onclick="() => OnBodyClickedAsync(body.Id)">@body.Name — @body.Subtitle</button>
+            }
+            @if (FocusedBody is { } focusedBody)
+            {
+                <HudPanel Body="focusedBody" Stats="Universe.Stats" OnClose="CloseAsync" @ref="hudPanel" />
+            }
         }
     </div>
     @if (state == SceneState.Unavailable)
@@ -29,6 +36,9 @@
 
     private const string FocusHistoryMarker = "loonaciaverse:home-focus";
     private ElementReference host;
+    private ElementReference root;
+    private HudPanel? hudPanel;
+    private string? domFocusId;
     private Services.SceneInterop? scene;
     private SceneState state = SceneState.Preparing;
     private bool disposed;
@@ -138,21 +148,64 @@
         }
     }
 
+    private Task HighlightAsync(string? id) => scene?.HighlightAsync(id) ?? Task.CompletedTask;
+
+    private Task OnKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (disposed || !IsHome || state != SceneState.Ready || FocusedBody is not { } body)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (args.Key == "Escape")
+        {
+            return CloseAsync();
+        }
+
+        if (args.Key is "ArrowLeft" or "ArrowRight")
+        {
+            var bodies = Universe.Bodies.ToList();
+            var index = bodies.IndexOf(body);
+            var offset = args.Key == "ArrowLeft" ? -1 : 1;
+            return OnBodyClickedAsync(bodies[(index + offset + bodies.Count) % bodies.Count].Id);
+        }
+
+        return Task.CompletedTask;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || disposed)
+        if (disposed)
         {
             return;
         }
 
-        scene = new Services.SceneInterop(JS);
-        scene.BodyClicked += OnBodyClickedAsync;
-        var ready = await scene.InitAsync(host, Universe);
-        if (!disposed)
+        if (firstRender)
         {
-            state = ready ? SceneState.Ready : SceneState.Unavailable;
-            StateHasChanged();
-            await ApplyFocusAsync();
+            scene = new Services.SceneInterop(JS);
+            scene.BodyClicked += OnBodyClickedAsync;
+            var ready = await scene.InitAsync(host, Universe);
+            if (!disposed)
+            {
+                state = ready ? SceneState.Ready : SceneState.Unavailable;
+                StateHasChanged();
+                await ApplyFocusAsync();
+            }
+
+            return;
+        }
+
+        if (IsHome && state == SceneState.Ready && domFocusId != FocusedBody?.Id)
+        {
+            domFocusId = FocusedBody?.Id;
+            if (domFocusId is not null && hudPanel is not null)
+            {
+                await hudPanel.FocusHeadingAsync();
+            }
+            else
+            {
+                await root.FocusAsync(preventScroll: true);
+            }
         }
     }
 

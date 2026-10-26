@@ -1,8 +1,10 @@
+using AngleSharp.Dom;
 using Bunit;
 using Bunit.TestDoubles;
 using Loonaciaverse.Web.Components;
 using Loonaciaverse.Web.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 
@@ -53,6 +55,7 @@ public class StarSystemTests
 
         Assert.Empty(component.Find(".scene-host").ChildNodes);
         Assert.Empty(component.FindAll("article.hud-frame"));
+        Assert.Empty(component.FindAll(".hud-layer button"));
         Assert.Equal(universe.Site.Title, component.Find("h1").TextContent);
 
         init.SetResult(false);
@@ -463,6 +466,7 @@ public class StarSystemTests
         {
             Assert.Equal(new object?[] { "projects", true }, Assert.Single(module.VerifyInvoke("focus", 1)).Arguments);
             Assert.Equal("projects", component.FindComponent<HudPanel>().Instance.Body.Id);
+            VerifyLastFocus(context, component.Find("h2"), 1);
         });
     }
 
@@ -576,16 +580,242 @@ public class StarSystemTests
 
         await scene.FocusAsync("blog", true);
         await scene.ClearFocusAsync();
+        await scene.HighlightAsync("blog");
         Assert.Empty(context.JSInterop.Invocations);
         Assert.False(await scene.InitAsync(default, TestContent.Universe()));
         await scene.FocusAsync("blog", false);
         await scene.ClearFocusAsync();
+        await scene.HighlightAsync(null);
         await scene.DisposeAsync();
         await scene.FocusAsync("blog", true);
         await scene.ClearFocusAsync();
+        await scene.HighlightAsync("about");
 
         module.VerifyNotInvoke("focus");
         module.VerifyNotInvoke("clearFocus");
+        module.VerifyNotInvoke("highlight");
+    }
+
+    [Fact]
+    public void ReadySceneRendersHiddenBodyButtonsInUniverseOrderWithAccessibleNames()
+    {
+        using var context = new BunitContext();
+        SetupScene(context);
+        var universe = TestContent.Universe();
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, universe));
+
+        var buttons = component.FindAll(".hud-layer > button");
+        Assert.Equal(universe.Bodies.Select(body => $"{body.Name} — {body.Subtitle}"), buttons.Select(button => button.TextContent));
+        Assert.All(buttons, button =>
+        {
+            Assert.Contains("visually-hidden", button.ClassList);
+            Assert.Equal("button", button.GetAttribute("type"));
+            Assert.False(button.HasAttribute("disabled"));
+            Assert.False(button.HasAttribute("tabindex"));
+        });
+        Assert.Equal("-1", component.Find(".star-system").GetAttribute("tabindex"));
+        context.JSInterop.VerifyNotInvoke("Blazor._internal.domWrapper.focus");
+    }
+
+    [Fact]
+    public void UnavailableSceneDoesNotRenderBodyButtons()
+    {
+        using var context = new BunitContext();
+        SetupScene(context, false);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        Assert.Empty(component.FindAll(".hud-layer button"));
+        context.JSInterop.VerifyNotInvoke("Blazor._internal.domWrapper.focus");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BodyButtonFocusAndBlurHighlightTheBodyEvenWhenTheSceneThrows(bool throws)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        if (throws)
+        {
+            module.SetupVoid("highlight", _ => true).SetException(new JSException("Highlight failed"));
+        }
+        var universe = TestContent.Universe();
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, universe));
+
+        for (var index = 0; index < universe.Bodies.Count; index++)
+        {
+            component.FindAll(".hud-layer > button")[index].Focus();
+            Assert.Equal(new object?[] { universe.Bodies[index].Id }, module.Invocations.Last().Arguments);
+            component.FindAll(".hud-layer > button")[index].Blur();
+            Assert.Equal(new object?[] { null }, module.Invocations.Last().Arguments);
+        }
+
+        module.VerifyInvoke("highlight", 8);
+        Assert.Empty(Navigation(context).History);
+        Assert.False(context.Renderer.UnhandledException.IsCompleted);
+    }
+
+    [Fact]
+    public void BodyButtonSelectionPushesThenReplacesAndPreservesTheMarker()
+    {
+        using var context = new BunitContext();
+        SetupScene(context);
+        var navigation = Navigation(context);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        component.FindAll(".hud-layer > button")[2].Click();
+
+        var pushed = Assert.Single(navigation.History);
+        Assert.Equal("/?focus=blog", pushed.Uri);
+        Assert.False(pushed.Options.ReplaceHistoryEntry);
+        var marker = pushed.Options.HistoryEntryState;
+        Assert.False(string.IsNullOrEmpty(marker));
+
+        component.FindAll(".hud-layer > button")[3].Click();
+
+        Assert.Equal("/?focus=playground", navigation.History.First().Uri);
+        Assert.True(navigation.History.First().Options.ReplaceHistoryEntry);
+        Assert.Equal(marker, navigation.HistoryEntryState);
+        Assert.Equal("playground", component.FindComponent<HudPanel>().Instance.Body.Id);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EscapeClosesUsingTheExistingHistoryRule(bool pushed)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        context.JSInterop.SetupVoid("history.back").SetVoidResult();
+        var navigation = Navigation(context);
+        if (!pushed)
+        {
+            navigation.NavigateTo("/?focus=blog");
+        }
+        var (component, root) = RenderWithRootSnapshot(context, module);
+        if (pushed)
+        {
+            component.FindAll(".hud-layer > button")[2].Click();
+        }
+
+        // Dispatch on the heading to cover key events bubbling from the HUD.
+        component.Find("h2").KeyDown(new KeyboardEventArgs { Key = "Escape" });
+
+        if (pushed)
+        {
+            context.JSInterop.VerifyInvoke("history.back", 1);
+            Assert.Equal("blog", component.FindComponent<HudPanel>().Instance.Body.Id);
+            await component.InvokeAsync(() => navigation.NavigateTo("/"));
+        }
+        else
+        {
+            context.JSInterop.VerifyNotInvoke("history.back");
+            Assert.Equal("/", navigation.History.First().Uri);
+            Assert.True(navigation.History.First().Options.ReplaceHistoryEntry);
+        }
+
+        Assert.Empty(component.FindComponents<HudPanel>());
+        VerifyLastFocus(context, root, 2);
+    }
+
+    [Theory]
+    [InlineData("ArrowRight", false)]
+    [InlineData("ArrowLeft", false)]
+    [InlineData("ArrowRight", true)]
+    [InlineData("ArrowLeft", true)]
+    public void ArrowKeysCycleAllBodiesWithReplaceAndPreserveHistoryState(string key, bool pushed)
+    {
+        using var context = new BunitContext();
+        SetupScene(context);
+        var navigation = Navigation(context);
+        if (!pushed)
+        {
+            navigation.NavigateTo("/?focus=about", new NavigationOptions { HistoryEntryState = "external-entry" });
+        }
+        var universe = TestContent.Universe();
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, universe));
+        if (pushed)
+        {
+            component.FindAll(".hud-layer > button")[0].Click();
+        }
+        var marker = navigation.HistoryEntryState;
+        var heading = (IElement)component.Find("h2").Clone();
+
+        for (var step = 1; step <= universe.Bodies.Count; step++)
+        {
+            component.Find("h2").KeyDown(new KeyboardEventArgs { Key = key });
+
+            var index = key == "ArrowRight" ? step % universe.Bodies.Count : (universe.Bodies.Count - step) % universe.Bodies.Count;
+            var expected = universe.Bodies[index];
+            Assert.Equal($"/?focus={expected.Id}", navigation.History.First().Uri);
+            Assert.True(navigation.History.First().Options.ReplaceHistoryEntry);
+            Assert.Equal(marker, navigation.HistoryEntryState);
+            Assert.Equal(expected.Name, component.Find("h2").TextContent);
+            VerifyLastFocus(context, heading, step + 1);
+        }
+    }
+
+    [Theory]
+    [InlineData("ArrowLeft")]
+    [InlineData("ArrowRight")]
+    [InlineData("Escape")]
+    [InlineData("Enter")]
+    public void OverviewIgnoresRootKeyboardInput(string key)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        component.Find(".star-system").KeyDown(new KeyboardEventArgs { Key = key });
+
+        Assert.Empty(Navigation(context).History);
+        module.VerifyNotInvoke("focus");
+        module.VerifyNotInvoke("clearFocus");
+        context.JSInterop.VerifyNotInvoke("history.back");
+    }
+
+    [Fact]
+    public async Task DirectFocusAndBodyChangesFocusTheHeadingAndClosingFocusesTheRootOnlyOnce()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var (component, root) = RenderWithRootSnapshot(context, module);
+        var heading = (IElement)component.Find("h2").Clone();
+
+        Assert.Equal("-1", component.Find("h2").GetAttribute("tabindex"));
+        VerifyLastFocus(context, heading, 1);
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=about"));
+        VerifyLastFocus(context, heading, 2);
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=about#same-body"));
+        component.Render();
+        VerifyLastFocus(context, heading, 2);
+
+        component.Find("button[aria-label='CLOSE']").Click();
+        VerifyLastFocus(context, root, 3);
+        component.Render();
+        VerifyLastFocus(context, root, 3);
+        module.VerifyNotInvoke("highlight");
+    }
+
+    private static (IRenderedComponent<StarSystem> Component, IElement Root) RenderWithRootSnapshot(BunitContext context, BunitJSModuleInterop module)
+    {
+        var init = module.Setup<bool>("init", _ => true);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+        // bUnit clears its synthetic element-reference attributes on later renders, so preserve the initial DOM identity.
+        var root = (IElement)component.Find(".star-system").Clone();
+        init.SetResult(true);
+        component.WaitForAssertion(() => Assert.Equal(4, component.FindAll(".hud-layer > button").Count));
+        return (component, root);
+    }
+
+    private static void VerifyLastFocus(BunitContext context, IElement target, int count)
+    {
+        context.JSInterop.VerifyFocusAsyncInvoke(count);
+        var invocation = context.JSInterop.Invocations.Last(call => call.Identifier == "Blazor._internal.domWrapper.focus");
+        invocation.Arguments[0].ShouldBeElementReferenceTo(target);
+        Assert.Equal(true, invocation.Arguments[1]);
     }
 
     private static BunitJSModuleInterop SetupScene(BunitContext context, bool ready = true)
@@ -594,6 +824,7 @@ public class StarSystemTests
         module.Setup<bool>("init", _ => true).SetResult(ready);
         module.SetupVoid("focus", _ => true).SetVoidResult();
         module.SetupVoid("clearFocus").SetVoidResult();
+        module.SetupVoid("highlight", _ => true).SetVoidResult();
         module.SetupVoid("dispose").SetVoidResult();
         return module;
     }
