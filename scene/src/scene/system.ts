@@ -1,4 +1,5 @@
-import { AmbientLight, BufferGeometry, Color, Float32BufferAttribute, Mesh, MeshBasicMaterial, MeshStandardMaterial, PointLight, Points, PointsMaterial, Scene, SphereGeometry } from "three";
+import { AdditiveBlending, AmbientLight, BufferGeometry, Color, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshStandardMaterial, PointLight, Points, PointsMaterial, Scene, SphereGeometry } from "three";
+import type { Vector3 } from "three";
 import { OrbitClock, orbitPosition } from "./orbit";
 import type { UniverseDto } from "./types";
 
@@ -48,10 +49,34 @@ export function createSystem(universe: UniverseDto) {
   const starMaterial = new PointsMaterial({ color: "#d5e5ff", size: 0.12, sizeAttenuation: true });
   scene.add(new Points(starGeometry, starMaterial));
 
+  // Each streak starts at an existing star and extends along the travel direction.
+  const streakPositions = new Float32BufferAttribute(new Float32Array(STAR_COUNT * 6), 3);
+  const streakGeometry = new BufferGeometry();
+  streakGeometry.setAttribute("position", streakPositions);
+  const streakMaterial = new LineBasicMaterial({ color: "#d5e5ff", transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false });
+  const streaks = new LineSegments(streakGeometry, streakMaterial);
+  streaks.visible = false;
+  streaks.frustumCulled = false;
+  scene.add(streaks);
+
   return {
     scene,
     bodies,
     radius,
+    setWarpStreak(direction: Vector3, amount: number): void {
+      streaks.visible = amount > 0;
+      streakMaterial.opacity = amount;
+      starMaterial.opacity = 1 - amount;
+      starMaterial.transparent = true;
+      const length = radius * 6 * amount;
+      for (let index = 0; index < STAR_COUNT; index++) {
+        const offset = index * 3;
+        const x = positions[offset], y = positions[offset + 1], z = positions[offset + 2];
+        streakPositions.setXYZ(index * 2, x, y, z);
+        streakPositions.setXYZ(index * 2 + 1, x + direction.x * length, y + direction.y * length, z + direction.z * length);
+      }
+      streakPositions.needsUpdate = true;
+    },
     update(deltaSeconds: number, orbitsPaused = false): void {
       clock.advance(deltaSeconds, orbitsPaused);
       bodies.forEach((mesh, index) => {
@@ -67,6 +92,8 @@ export function createSystem(universe: UniverseDto) {
       });
       starGeometry.dispose();
       starMaterial.dispose();
+      streakGeometry.dispose();
+      streakMaterial.dispose();
       scene.clear();
     },
   };

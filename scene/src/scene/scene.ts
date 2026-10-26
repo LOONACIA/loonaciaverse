@@ -1,11 +1,28 @@
 import { PerspectiveCamera, Raycaster, Vector2, WebGLRenderer } from "three";
+import type { Quaternion, Vector3 } from "three";
 import { CameraTween, focusPose, overviewPose } from "./camera";
 import type { Pose } from "./camera";
 import { shouldPauseOrbits } from "./orbit";
 import { createSystem } from "./system";
 import type { DotNetCallbacks, UniverseDto } from "./types";
+import { WARP_DURATION_MS, warpTimeline } from "./warp";
+
+interface WarpState {
+  startedAt: number;
+  startPosition: Vector3;
+  direction: Vector3;
+  distance: number;
+  startRotation: Quaternion;
+  endRotation: Quaternion;
+  overlay: HTMLDivElement;
+  originalContainerPosition: string | null;
+  promise: Promise<void>;
+  resolve: () => void;
+  timerId: ReturnType<typeof setTimeout>;
+}
 
 interface SceneState {
+  container: HTMLElement;
   renderer: WebGLRenderer;
   system: ReturnType<typeof createSystem>;
   callbacks: DotNetCallbacks;
@@ -19,6 +36,7 @@ interface SceneState {
   onVisibilityChange: () => void;
   frameId: number | null;
   lastTimestamp: number | null;
+  warp: WarpState | null;
 }
 
 let state: SceneState | null = null;
@@ -34,7 +52,7 @@ function bodyPose(current: SceneState, bodyId: string): Pose | null {
 }
 
 export function focus(bodyId: string, immediate: boolean): void {
-  if (!state) return;
+  if (!state || state.warp) return;
   const pose = bodyPose(state, bodyId);
   if (!pose) return;
   state.focusedId = bodyId;
@@ -43,14 +61,63 @@ export function focus(bodyId: string, immediate: boolean): void {
 }
 
 export function clearFocus(): void {
-  if (!state) return;
+  if (!state || state.warp) return;
   state.focusedId = null;
   state.tween.retarget(overviewPose(state.system.radius, state.camera.aspect), 0.8);
 }
 
 export function highlight(bodyId: string | null): void {
-  if (!state) return;
+  if (!state || state.warp) return;
   state.highlightedId = state.system.bodies.some((mesh) => mesh.userData.bodyId === bodyId) ? bodyId : null;
+}
+
+function updateWarp(current: SceneState, elapsedMs: number): void {
+  const active = current.warp!;
+  const timeline = warpTimeline(elapsedMs);
+  current.camera.position.copy(active.startPosition).addScaledVector(active.direction, active.distance * 0.98 * timeline.dash);
+  current.camera.quaternion.slerpQuaternions(active.startRotation, active.endRotation, Math.min(1, timeline.dash * 4));
+  current.system.setWarpStreak(active.direction, timeline.streak);
+  active.overlay.style.opacity = String(timeline.fade);
+}
+
+export function warp(bodyId: string): Promise<void> {
+  const current = state;
+  if (!current) return Promise.resolve();
+  const body = current.system.bodies.find((mesh) => mesh.userData.bodyId === bodyId);
+  if (!body) return Promise.resolve();
+  if (current.warp) return current.warp.promise;
+
+  const startPosition = current.camera.position.clone();
+  const direction = body.position.clone().sub(startPosition);
+  const distance = direction.length();
+  direction.normalize();
+  const startRotation = current.camera.quaternion.clone();
+  current.camera.lookAt(body.position);
+  const endRotation = current.camera.quaternion.clone();
+  current.camera.quaternion.copy(startRotation);
+
+  const overlay = document.createElement("div");
+  overlay.setAttribute("aria-hidden", "true");
+  Object.assign(overlay.style, { position: "absolute", inset: "0", backgroundColor: "#05070d", opacity: "0", pointerEvents: "none" });
+  const originalContainerPosition = getComputedStyle(current.container).position === "static" ? current.container.style.position : null;
+  if (originalContainerPosition !== null) current.container.style.position = "relative";
+  current.container.append(overlay);
+  current.hoveredId = null;
+  current.highlightedId = null;
+  current.renderer.domElement.style.cursor = "";
+
+  let resolve!: () => void;
+  const promise = new Promise<void>((complete) => { resolve = complete; });
+  current.warp = {
+    startedAt: performance.now(), startPosition, direction, distance, startRotation, endRotation,
+    overlay, originalContainerPosition, promise, resolve,
+    // Completion must not depend on rAF: hidden tabs suspend the render loop.
+    timerId: setTimeout(() => {
+      if (state === current) updateWarp(current, WARP_DURATION_MS);
+      resolve();
+    }, WARP_DURATION_MS),
+  };
+  return promise;
 }
 
 function supportsWebGL2(): boolean {
@@ -91,9 +158,11 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     renderer.setSize(width, height);
     camera.aspect = width / height;
     const overview = overviewPose(system.radius, camera.aspect);
-    const pose = current.focusedId === null ? overview : bodyPose(current, current.focusedId)!;
-    current.tween.retarget(pose, 0);
-    applyPose(camera, pose);
+    if (!current.warp) {
+      const pose = current.focusedId === null ? overview : bodyPose(current, current.focusedId)!;
+      current.tween.retarget(pose, 0);
+      applyPose(camera, pose);
+    }
     camera.far = Math.max(1000, Math.hypot(overview.position.x, overview.position.y, overview.position.z) + system.radius * 16);
     camera.updateProjectionMatrix();
   };
@@ -104,8 +173,9 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     }
     const delta = current.lastTimestamp === null ? 0 : (timestamp - current.lastTimestamp) / 1000;
     current.lastTimestamp = timestamp;
-    system.update(delta, shouldPauseOrbits(current.focusedId !== null, current.hoveredId !== null, current.highlightedId !== null));
-    applyPose(camera, current.tween.step(delta));
+    system.update(delta, current.warp !== null || shouldPauseOrbits(current.focusedId !== null, current.hoveredId !== null, current.highlightedId !== null));
+    if (current.warp) updateWarp(current, performance.now() - current.warp.startedAt);
+    else applyPose(camera, current.tween.step(delta));
     renderer.render(system.scene, camera);
     current.frameId = requestAnimationFrame(frame);
   };
@@ -133,13 +203,16 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     return raycaster.intersectObjects(system.bodies, false)[0]?.object.userData.bodyId ?? null;
   };
   const onClick = (event: MouseEvent) => {
+    if (current.warp) return;
     void current.callbacks.invokeMethodAsync("OnBodyClicked", pick(event)).catch(() => {});
   };
   const onPointerLeave = () => {
+    if (current.warp) return;
     current.hoveredId = null;
     renderer.domElement.style.cursor = "";
   };
   const onPointerMove = (event: PointerEvent) => {
+    if (current.warp) return;
     if (event.pointerType !== "mouse" && event.pointerType !== "pen") {
       onPointerLeave();
       return;
@@ -156,9 +229,9 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   const observer = new ResizeObserver(resize);
   const initialPose = overviewPose(system.radius, 1);
   const current: SceneState = {
-    renderer, system, callbacks, camera, tween: new CameraTween(initialPose, initialPose, 0),
+    container, renderer, system, callbacks, camera, tween: new CameraTween(initialPose, initialPose, 0),
     focusedId: null, hoveredId: null, highlightedId: null, removePointerListeners,
-    observer, onVisibilityChange, frameId: null, lastTimestamp: null,
+    observer, onVisibilityChange, frameId: null, lastTimestamp: null, warp: null,
   };
   state = current;
   container.append(renderer.domElement);
@@ -185,6 +258,12 @@ export function dispose(): void {
   document.removeEventListener("visibilitychange", current.onVisibilityChange);
   current.removePointerListeners();
   current.observer.disconnect();
+  if (current.warp) {
+    clearTimeout(current.warp.timerId);
+    current.warp.resolve();
+    current.warp.overlay.remove();
+    if (current.warp.originalContainerPosition !== null) current.container.style.position = current.warp.originalContainerPosition;
+  }
   current.system.dispose();
   current.renderer.dispose();
   current.renderer.forceContextLoss();

@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import { clearFocus, dispose, focus, highlight, init } from "../src/scene/scene";
+import { clearFocus, dispose, focus, highlight, init, warp } from "../src/scene/scene";
 import type { UniverseDto } from "../src/scene/types";
 
 // Scene fields from content/universe.yml; this fixture is only used by the sandbox.
@@ -32,12 +32,30 @@ const universe: UniverseDto = {
 const container = document.getElementById("scene")!;
 const immediate = document.getElementById("immediate") as HTMLInputElement;
 const highlightToggles: HTMLInputElement[] = [];
+let warping = false;
+let disposed = false;
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
 for (const body of universe.bodies) {
   const row = document.createElement("div");
   const button = document.createElement("button");
   button.type = "button";
   button.textContent = `FOCUS ${body.name}`;
   button.addEventListener("click", () => focus(body.id, immediate.checked));
+  const warpButton = document.createElement("button");
+  warpButton.type = "button";
+  warpButton.textContent = `WARP ${body.name}`;
+  warpButton.addEventListener("click", async () => {
+    if (warping) return;
+    warping = true;
+    await warp(body.id);
+    if (disposed) return;
+    restartTimer = setTimeout(() => {
+      restartTimer = null;
+      highlightToggles.forEach((toggle) => { toggle.checked = false; });
+      initialize();
+      warping = false;
+    }, 1000);
+  });
   const label = document.createElement("label");
   const toggle = document.createElement("input");
   toggle.type = "checkbox";
@@ -48,25 +66,32 @@ for (const body of universe.bodies) {
   });
   highlightToggles.push(toggle);
   label.append(toggle, "HIGHLIGHT");
-  row.append(button, label);
+  row.append(button, warpButton, label);
   document.getElementById("body-controls")!.append(row);
 }
 document.getElementById("clear")!.addEventListener("click", clearFocus);
-const initialized = init(container, universe, {
-  async invokeMethodAsync(methodName, ...args) {
-    console.log(methodName, ...args);
-    if (methodName === "OnBodyClicked") {
-      const id = args[0] as string | null;
-      if (id === null) clearFocus();
-      else focus(id, immediate.checked);
-    }
-  },
-});
-if (!initialized) {
-  container.textContent = "Scene unavailable: WebGL2 is required and reduced motion must be off.";
+function initialize() {
+  const initialized = init(container, universe, {
+    async invokeMethodAsync(methodName, ...args) {
+      console.log(methodName, ...args);
+      if (methodName === "OnBodyClicked") {
+        const id = args[0] as string | null;
+        if (id === null) clearFocus();
+        else focus(id, immediate.checked);
+      }
+    },
+  });
+  if (!initialized) {
+    container.textContent = "Scene unavailable: WebGL2 is required and reduced motion must be off.";
+  }
 }
+initialize();
 
 if (import.meta.hot) {
-  import.meta.hot.dispose(dispose);
+  import.meta.hot.dispose(() => {
+    disposed = true;
+    if (restartTimer !== null) clearTimeout(restartTimer);
+    dispose();
+  });
 }
 

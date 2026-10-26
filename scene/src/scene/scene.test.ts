@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Mesh, PerspectiveCamera, Scene, SphereGeometry, WebGLRenderer } from "three";
+import { LineSegments, Mesh, PerspectiveCamera, Scene, SphereGeometry, WebGLRenderer } from "three";
 import { focusPose, overviewPose } from "./camera";
-import { clearFocus, dispose, focus, highlight, init } from "./scene";
+import { clearFocus, dispose, focus, highlight, init, warp } from "./scene";
 import type { DotNetCallbacks, UniverseDto } from "./types";
+import { WARP_DURATION_MS } from "./warp";
 
 vi.mock("three", async (importOriginal) => {
   const actual = await importOriginal<typeof import("three")>();
@@ -63,6 +64,7 @@ beforeEach(() => {
 
 afterEach(() => {
   dispose();
+  vi.useRealTimers();
   document.body.innerHTML = "";
   vi.restoreAllMocks();
   vi.clearAllMocks();
@@ -169,7 +171,7 @@ function startScene() {
   tick(0);
   const [scene, camera] = vi.mocked(active.render).mock.calls[0] as [Scene, PerspectiveCamera];
   const body = scene.children.find((child) => child.userData.bodyId === "planet") as Mesh<SphereGeometry>;
-  return { active, camera, body };
+  return { active, camera, body, scene };
 }
 
 function bodyScreenPosition(camera: PerspectiveCamera, body: Mesh) {
@@ -286,5 +288,133 @@ describe("scene focus and input", () => {
     active.domElement.dispatchEvent(new PointerEvent("pointerleave"));
     expect(callbacks.invokeMethodAsync).not.toHaveBeenCalled();
     expect(active.domElement.style.cursor).toBe("");
+  });
+});
+
+describe("scene warp", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+  });
+
+  it("resolves immediately before initialization, for unknown IDs, and after disposal", async () => {
+    await expect(warp("planet")).resolves.toBeUndefined();
+    init(container, universe, callbacks);
+    await expect(warp("unknown")).resolves.toBeUndefined();
+    expect(container.children).toHaveLength(1);
+    dispose();
+    await expect(warp("planet")).resolves.toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("finishes by timer when the tab is hidden without rendering another frame", async () => {
+    const { active } = startScene();
+    vi.spyOn(document, "hidden", "get").mockReturnValue(true);
+    document.dispatchEvent(new Event("visibilitychange"));
+    const completed = vi.fn();
+    const pending = warp("planet").then(completed);
+    const overlay = container.lastElementChild as HTMLElement;
+    expect(overlay.style.backgroundColor).toBe("#05070d");
+    expect(overlay.style.opacity).toBe("0");
+    await vi.advanceTimersByTimeAsync(WARP_DURATION_MS - 1);
+    expect(completed).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await pending;
+    expect(completed).toHaveBeenCalledOnce();
+    expect(overlay.style.opacity).toBe("1");
+    expect(active.render).toHaveBeenCalledOnce();
+    expect(frames.size).toBe(0);
+  });
+
+  it("accelerates from the current camera position toward a stationary body and stretches stars along travel", () => {
+    const { camera, body, scene } = startScene();
+    focus("planet", false);
+    tick(200);
+    const start = camera.position.clone();
+    const target = body.position.clone();
+    const direction = target.clone().sub(start).normalize();
+    void warp("planet");
+    vi.advanceTimersByTime(100);
+    tick(300);
+    const firstDistance = camera.position.distanceTo(start);
+    expect(firstDistance).toBeGreaterThan(0);
+    vi.advanceTimersByTime(100);
+    tick(400);
+    expect(camera.position.distanceTo(start) - firstDistance).toBeGreaterThan(firstDistance);
+    expect(camera.position.clone().sub(start).normalize().distanceTo(direction)).toBeLessThan(1e-6);
+    expect(body.position.equals(target)).toBe(true);
+    vi.advanceTimersByTime(200);
+    tick(600);
+    const streaks = scene.children.find((child) => child instanceof LineSegments) as LineSegments;
+    expect(streaks.visible).toBe(true);
+    const positions = streaks.geometry.getAttribute("position");
+    const segment = start.clone().set(positions.getX(1) - positions.getX(0), positions.getY(1) - positions.getY(0), positions.getZ(1) - positions.getZ(0));
+    expect(segment.length()).toBeGreaterThan(1);
+    expect(segment.normalize().distanceTo(direction)).toBeLessThan(1e-5);
+    expect((container.lastElementChild as HTMLElement).style.opacity).toBe("0");
+  });
+
+  it("ignores pointer, focus, clear and highlight commands, even after completion, and shares repeated warps", async () => {
+    const { active, camera, body } = startScene();
+    const screenPosition = bodyScreenPosition(camera, body);
+    const target = body.position.clone();
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { ...screenPosition, pointerType: "mouse" }));
+    const pending = warp("planet");
+    expect(warp("planet")).toBe(pending);
+    expect(active.domElement.style.cursor).toBe("");
+    const start = camera.position.clone();
+    const commands = () => {
+      focus("planet", true);
+      clearFocus();
+      highlight("planet");
+      highlight(null);
+      active.domElement.dispatchEvent(new MouseEvent("click", screenPosition));
+      active.domElement.dispatchEvent(new PointerEvent("pointermove", { ...screenPosition, pointerType: "mouse" }));
+      active.domElement.dispatchEvent(new PointerEvent("pointerleave"));
+    };
+    commands();
+    expect(camera.position.equals(start)).toBe(true);
+    Object.defineProperty(container, "clientWidth", { value: 400 });
+    resize([], {} as ResizeObserver);
+    expect(camera.position.equals(start)).toBe(true);
+    await vi.advanceTimersByTimeAsync(WARP_DURATION_MS);
+    await pending;
+    const end = camera.position.clone();
+    commands();
+    tick(1000);
+    expect(camera.position.equals(end)).toBe(true);
+    expect(body.position.equals(target)).toBe(true);
+    expect(active.domElement.style.cursor).toBe("");
+    expect(callbacks.invokeMethodAsync).not.toHaveBeenCalled();
+  });
+
+  it("resolves on disposal, removes the overlay, restores positioning and releases streak resources", async () => {
+    container.style.position = "static";
+    const { scene } = startScene();
+    const streaks = scene.children.find((child) => child instanceof LineSegments) as LineSegments;
+    const releaseGeometry = vi.spyOn(streaks.geometry, "dispose");
+    const releaseMaterial = vi.spyOn(streaks.material as import("three").LineBasicMaterial, "dispose");
+    const pending = warp("planet");
+    expect(container.style.position).toBe("relative");
+    expect(container.children).toHaveLength(2);
+    dispose();
+    await expect(pending).resolves.toBeUndefined();
+    expect(container.children).toHaveLength(0);
+    expect(container.style.position).toBe("static");
+    expect(vi.getTimerCount()).toBe(0);
+    expect(releaseGeometry).toHaveBeenCalledOnce();
+    expect(releaseMaterial).toHaveBeenCalledOnce();
+  });
+
+  it("resolves the previous warp on reinitialization and starts a clean scene", async () => {
+    startScene();
+    const previous = warp("planet");
+    init(container, universe, callbacks);
+    await expect(previous).resolves.toBeUndefined();
+    expect(container.children).toHaveLength(1);
+    expect(vi.getTimerCount()).toBe(0);
+    const next = warp("planet");
+    expect(next).not.toBe(previous);
+    await vi.advanceTimersByTimeAsync(WARP_DURATION_MS);
+    await expect(next).resolves.toBeUndefined();
   });
 });
