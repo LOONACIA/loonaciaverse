@@ -24,13 +24,15 @@ loonaciaverse/
 │     ├─ Services/                   # HttpContentService, SceneInterop
 │     └─ wwwroot/
 │        ├─ index.html               # 부팅 화면 마크업, 정적 링크, 공통 OG
+│        ├─ og-image.png             # 1200×630 기본 OG 이미지(임시, 사이트 주인이 교체)
 │        ├─ staticwebapp.config.json
 │        ├─ css/  fonts/
 │        ├─ content/                 # [빌드 산출물] ContentBuilder 출력
 │        ├─ js/                      # [빌드 산출물] Vite 출력 (scene.js, highlight.js, toc.js)
 │        └─ feed.xml, sitemap.xml, robots.txt   # [빌드 산출물]
 ├─ tools/
-│  └─ Loonaciaverse.ContentBuilder/  # 콘솔: content/ → wwwroot/content/ (Markdig, YamlDotNet)
+│  ├─ Loonaciaverse.ContentBuilder/  # 콘솔: content/ → wwwroot/content/ (Markdig, YamlDotNet)
+│  └─ Loonaciaverse.BudgetCheck/     # 콘솔: publish 결과의 홈 전송량 검사
 ├─ scene/                            # npm 프로젝트: TypeScript + Vite + Vitest
 │  ├─ src/scene/
 │  │  ├─ scene.ts                   # 공개 계약, 렌더 루프, 입력, 블룸·패럴랙스, 수명주기
@@ -55,8 +57,11 @@ loonaciaverse/
 │  └─ projects/{slug}/index.md
 ├─ tests/
 │  ├─ Loonaciaverse.ContentBuilder.Tests/   # xUnit
+│  ├─ Loonaciaverse.BudgetCheck.Tests/      # xUnit
 │  └─ Loonaciaverse.Web.Tests/              # bUnit
 ├─ .github/workflows/
+│  └─ ci.yml                         # PR 테스트, main 테스트·publish·예산 검사·SWA 배포
+├─ artifacts/                        # [빌드 산출물] publish 결과(artifacts/publish/)
 └─ docs/
 ```
 `[빌드 산출물]` 경로는 모두 `.gitignore`에 넣는다.
@@ -118,6 +123,7 @@ dotnet build src/Loonaciaverse.Web
 - 두 타깃 모두 `Inputs`/`Outputs`로 증분 빌드한다. ContentBuilder 타깃은 `content/**`, ContentBuilder DLL, 입력 목록과 Web csproj를 `Inputs`, `$(IntermediateOutputPath)content-builder.stamp`를 `Outputs`로 사용한다. `$(BaseIntermediateOutputPath)content-builder.inputs`에 파일 목록과 Configuration을 기록해 파일 삭제와 Debug/Release 전환도 감지하며, 필수 산출물이 없으면 다시 생성한다. `scene/node_modules`가 없으면 `npm ci`를 먼저 실행한다.
 - 정적 웹 자산 수집 전에 생성 파일의 `Content` 항목을 갱신해 첫 빌드와 publish에도 포함한다. 변환 실패는 빌드를 실패시키며 오류는 빌드 출력에 표시된다.
 - Web csproj에 `content/**`와 `scene/src/**`를 `Watch` 항목으로 추가해 `dotnet watch`가 변경을 감지하게 한다.
+- 글·프로젝트·About 본문에 `![제목](https://www.youtube.com/watch?v=ID)` 또는 `![제목](https://youtu.be/ID)`를 쓰면 ContentBuilder의 `MediaEmbeds`가 `https://www.youtube-nocookie.com/embed/ID`를 가리키는 iframe(`class="youtube"`)으로 변환한다. 각 빌더는 `UseNoCookieMediaLinks()`를 `UseAdvancedExtensions()`보다 먼저 등록하며, `app.css`의 `.prose iframe.youtube`이 너비 100%, `aspect-ratio: 16 / 9`로 반응형 표시를 맞춘다.
 
 **런타임: 홈**
 ```
@@ -166,13 +172,16 @@ export function dispose(): void;
   - 없는 라우트나 slug는 테마형 404(LOST IN SPACE)로 보낸다. SWA 대체 경로 때문에 HTTP 상태는 200(soft 404)이다. 이는 알려진 한계다(ADR-001).
   - Blazor 기본 `#blazor-error-ui`는 테마에 맞게 스타일만 바꾼다.
 - **설정**:
-  - 사이트 설정은 `content/site.yml`, 천체는 `content/universe.yml`에 둔다. 코드에 하드코딩하지 않는다.
+  - 사이트 설정은 `content/site.yml`, 천체는 `content/universe.yml`에 둔다. 코드에 하드코딩하지 않는다. 예외로 정적이어야 하는 `index.html`의 공통 OG 값은 같은 값을 직접 쓰고, `OpenGraphTests`가 일치를 검사한다(아래 SEO 참고).
   - 빌드 설정은 MSBuild 속성으로 둔다(`Configuration`에 따라 초안 포함 여부 결정).
 - **SEO**:
   - 페이지별 `<PageTitle>`, `HeadContent`의 description과 canonical은 런타임에 설정한다.
   - `index.html`에는 사이트 공통 OG 태그와 기본 OG 이미지를 둔다.
+  - 공통 OG 값은 `content/site.yml`과 같아야 한다. `og:site_name`, `og:title`, `og:image:alt`는 `title`, `og:description`은 `description`을 쓴다. `og:url`은 `baseUrl` 끝의 `/`를 제거한 뒤 `/`를 붙이고, `og:image`는 같은 기준 URL에 `/og-image.png`를 붙인다. 사이트 설정을 바꿀 때 `index.html`도 함께 고친다.
+  - `og:type`은 `website`, `og:locale`은 `ko_KR`, `twitter:card`는 `summary_large_image`다. 기본 이미지는 `wwwroot/og-image.png`의 1200×630 PNG이며, 사이트 주인이 같은 크기의 최종 이미지로 교체한다. `og:image:width`, `og:image:height`에도 각각 `1200`, `630`을 쓴다.
+  - `OpenGraphTests`는 `site.yml`에서 빌드한 `universe.json`의 `SiteInfo`와 OG 값의 일치, URL의 절대 HTTPS 형식, 로컬 PNG의 존재·크기, 고정 메타 값과 태그 중복 여부를 검사한다. 일반 description과 canonical은 `index.html`에 넣지 않고 런타임 페이지 메타데이터에 맡기는지도 검사한다.
 - **캐시**: `staticwebapp.config.json`에서 `/content/*`에 `Cache-Control: no-cache`를 건다(ETag로 재검증). 배포 직후 옛 콘텐츠가 보이지 않게 하기 위해서다.
-- **SPA 라우팅**: `staticwebapp.config.json`의 `navigationFallback`을 `/index.html`로 한다. `/_framework/*`, `/content/*`, `/js/*`, `/css/*`, `/fonts/*`와 파일 확장자가 있는 경로는 제외해서, 없는 파일은 진짜 404가 나게 한다.
+- **SPA 라우팅**: `staticwebapp.config.json`의 `navigationFallback.rewrite`를 `/index.html`로 한다. `exclude`는 `/_framework/*`, `/content/*`, `/js/*`, `/css/*`, `/fonts/*`, `*.{css,js,json,wasm,xml,txt,png,jpg,jpeg,gif,svg,webp,ico,woff2}`로 설정해, 해당 정적 파일 경로에 없는 파일은 진짜 404가 나게 한다.
 - **크기**: Web csproj에 `InvariantGlobalization=true`를 켠다. 날짜는 `yyyy-MM-dd` 형식 문자열로 직접 포맷한다. 한국어 표시에는 영향이 없다.
 - **폰트**: woff2로 `wwwroot/fonts/`에 자체 호스팅한다(Michroma, Rajdhani, Pretendard dynamic subset). 외부 폰트 CDN에 의존하지 않는다.
 - **로깅·관측**: MVP에는 없다(분석 도구 범위 밖).
@@ -180,17 +189,43 @@ export function dispose(): void;
 ## 테스트
 | 대상 | 도구 | 명령 |
 |---|---|---|
-| ContentBuilder (front matter 파싱, 검증 실패, 인덱스·RSS·sitemap·TOC 생성, 초안 제외) | xUnit | `dotnet test` |
-| Web 컴포넌트·SceneInterop (URL↔포커스, history·닫기, 키보드 순환·DOM 포커스, TRAVEL·실패 시 이동, fallback·수명주기, HUD 스탯·잠금, 상단 바, 목록·상세 렌더, 404) | bUnit + 가짜 `IContentService`·JS interop | `dotnet test` |
+| ContentBuilder (front matter 파싱, 검증 실패, 인덱스·RSS·sitemap·TOC 생성, 초안 제외, YouTube 임베드) | xUnit | `dotnet test` |
+| Web 컴포넌트·SceneInterop (URL↔포커스, history·닫기, 키보드 순환·DOM 포커스, TRAVEL·실패 시 이동, fallback·수명주기, HUD 스탯·잠금, 상단 바, 목록·상세 렌더, 404), OG 일치·이미지 및 SWA 설정 검사 | xUnit + bUnit + 가짜 `IContentService`·JS interop | `dotnet test` |
+| 전송량 예산 검사 (집계·제외 대상, `.br` 우선, Pretendard 청크 선택, 필수 자산, 한도 경계, 종료 코드) | xUnit | `dotnet test` |
 | 씬 순수 로직 (공전 위치·시간·정지 조건, 카메라 구도·보간·트윈, 워프 타임라인, 품질 단계·패럴랙스 각도, 이름표 상태·링 페이드) | Vitest | `npm test --prefix scene` |
 | 씬 구성·계약 (천체·별·셰이더 uniforms, 이름표·링, 클릭·호버·강조, 워프 타이머·입력 차단, resize·블룸·dispose) | Vitest + happy-dom, 렌더러·composer 모의 객체 | `npm test --prefix scene` |
 | 3D 렌더링 결과, 셰이더 표현, 연출 | 수동 확인(sandbox, 실제 사이트) | `npm run dev --prefix scene` |
 
 ## CI/CD (`.github/workflows/`)
-- **PR**: `dotnet test`, `npm test --prefix scene`
-- **main 푸시**:
-  1. 테스트를 실행한다.
-  2. `dotnet publish src/Loonaciaverse.Web -c Release`로 게시한다.
-  3. 전송량 예산(PRD 제약)을 검사한다.
-  4. `Azure/static-web-apps-deploy`로 배포한다(`skip_app_build: true`, 게시 결과의 `wwwroot`를 업로드).
+- `.github/workflows/ci.yml`은 main 대상 PR과 main 푸시에서 실행한다. 두 job 모두 `ubuntu-latest`에서 .NET 10과 Node.js 22를 준비하고 `npm ci --prefix scene`으로 의존성을 설치한다.
+- **`test` job (PR·main 푸시)**: `dotnet test`, `npm test --prefix scene`을 실행한다. PR에서는 이 job만 실행한다.
+- **`deploy` job (main 푸시)**: `needs: test`로 테스트 통과를 기다리고 `if: github.event_name == 'push'`로 배포를 제한한다.
+  1. `dotnet publish src/Loonaciaverse.Web -c Release -o artifacts/publish`로 게시한다.
+  2. `dotnet run --project tools/Loonaciaverse.BudgetCheck -- artifacts/publish/wwwroot`로 전송량 예산(PRD 제약)을 검사한다. 실패하면 배포하지 않는다.
+  3. `Azure/static-web-apps-deploy@v1`로 배포한다(`action: upload`, `skip_app_build: true`, `app_location: artifacts/publish/wwwroot`). 배포 토큰은 저장소 secret `AZURE_STATIC_WEB_APPS_API_TOKEN`에서 읽는다.
 - SWA PR 미리보기 환경은 쓰지 않는다.
+
+### 홈 전송량 예산
+- `Loonaciaverse.BudgetCheck`는 publish 결과의 `wwwroot`를 입력받아 홈 첫 방문 전송량을 계산한다. 한도는 3,000,000바이트(십진수 3MB)이며, 한도와 같아도 통과한다.
+- 집계 대상은 `index.html`, `css/app.css`, `js/scene.js`, `content/universe.json`, Pretendard CSS(`fonts/pretendard/pretendardvariable-dynamic-subset.css`), 존재하는 `Loonaciaverse.Web.styles.css`, `_framework/` 아래의 모든 원본 파일(.NET 런타임·앱 어셈블리 등), `fonts/michroma/`와 `fonts/rajdhani/` 바로 아래의 모든 `.woff2`, 선택된 Pretendard 청크다.
+- 각 원본 파일에 `.br` 사본이 있으면 그 크기를 우선하고, 없으면 원본 크기를 쓴다. `.gz`로 대체하지 않는다. `_framework/`를 순회할 때 `.br`·`.gz` 사본은 독립 항목으로 더하지 않으며, 같은 자산 경로는 한 번만 센다.
+- Pretendard는 `universe.json`의 중첩 객체·배열을 포함한 모든 문자열 값에서 Unicode 코드 포인트를 모은 뒤, CSS의 `@font-face`별 `unicode-range`와 겹치는 청크만 센다. JSON 속성 이름은 대상이 아니다. 청크 URL은 CSS 파일 위치를 기준으로 해석한다.
+- 상세 페이지용 `js/highlight.js`, `js/toc.js`, 글·프로젝트·About JSON과 이미지, `og-image.png`, 폰트 라이선스 등 위 집계 대상 밖의 파일은 제외한다. 실제 브라우저 요청을 기록하는 도구가 아니므로 배포 후 개발자 도구에서도 전송량을 확인한다.
+- `index.html`, `css/app.css`, `js/scene.js`, `content/universe.json`, Pretendard CSS, `_framework/` 아래 최소 한 개의 `.wasm`, 선택된 Pretendard 청크는 필수다. 필수 원본이 없으면 `.br` 사본만 있어도 실패한다.
+- 파일별 크기를 큰 순서로 출력하고 합계를 표시한다. 종료 코드는 정상·예산 이내이면 `0`, 예산 초과·필수 자산 누락·읽기/JSON 오류이면 `1`, 인수 개수 오류나 입력 디렉토리 부재이면 `2`다.
+
+저장소 루트에서 로컬로 재현한다.
+
+```sh
+dotnet publish src/Loonaciaverse.Web -c Release -o artifacts/publish
+dotnet run --project tools/Loonaciaverse.BudgetCheck -- artifacts/publish/wwwroot
+```
+
+로컬에서는 기존 `artifacts/publish` 폴더를 지우고 다시 publish한다. 이전 publish의 지문 붙은 파일이 남으면 `_framework/` 집계에 포함되어 합계가 부풀 수 있다.
+
+### 배포 준비(수동, 한 번)
+1. GitHub 저장소를 만들고 push한다.
+2. Azure Static Web Apps Free 리소스를 만든다. 배포 소스는 **Other**로 골라 Azure가 저장소에 워크플로를 추가하지 않게 한다.
+3. 리소스의 배포 토큰을 GitHub 저장소 secret `AZURE_STATIC_WEB_APPS_API_TOKEN`에 등록한다.
+4. 사용자 지정 도메인으로 루트 도메인(DNS 업체의 ALIAS/ANAME 또는 Azure DNS)과 `www`(CNAME)를 추가한다. 루트 도메인을 기본 도메인으로 지정해 `www`가 루트로 리다이렉트되게 한다. HTTPS 인증서는 SWA가 발급한다.
+5. 배포 후 딥링크 새로고침, 없는 정적 파일의 404, `/content/*`의 `Cache-Control: no-cache`, 공유 미리보기(OG), 브라우저 개발자 도구의 홈 전송량을 확인한다.
