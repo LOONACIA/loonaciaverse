@@ -339,6 +339,14 @@ a {
     border: none;
 }
 
+.prose iframe.youtube {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border: 0;
+}
+
 #blazor-error-ui {
     display: none;
     position: fixed;

@@ -103,6 +103,16 @@ public class StaticAssetTests
         Assert.Equal(expectedValue, declaration.Groups["value"].Value.Trim());
     }
 
+    [Fact]
+    public void ProseYouTubeIframesUseResponsiveSixteenByNineLayout()
+    {
+        var css = File.ReadAllText(Path.Combine(ContentBuildIntegrationTests.FindWebRoot(), "css", "app.css"));
+        var rule = Assert.Single(Regex.Matches(css, @"\.prose\s+iframe\.youtube\s*\{(?<body>[^}]*)\}").Cast<Match>());
+        var declaration = Assert.Single(Regex.Matches(rule.Groups["body"].Value, @"aspect-ratio\s*:\s*(?<value>[^;]+);").Cast<Match>());
+
+        Assert.Equal("16 / 9", declaration.Groups["value"].Value.Trim());
+    }
+
     [Theory]
     [InlineData("#app")]
     [InlineData("noscript")]

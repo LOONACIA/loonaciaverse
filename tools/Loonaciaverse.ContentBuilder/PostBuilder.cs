@@ -10,7 +10,8 @@ namespace Loonaciaverse.ContentBuilder;
 
 public static class PostBuilder
 {
-    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UseAutoIdentifiers(AutoIdentifierOptions.GitHub).UseAdvancedExtensions().UseYamlFrontMatter().Build();
+    private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
+        .UseAutoIdentifiers(AutoIdentifierOptions.GitHub).UseNoCookieMediaLinks().UseAdvancedExtensions().UseYamlFrontMatter().Build();
 
     public static BuildResult Build(string contentDir, string contentOutputDir, bool includeDrafts)
     {
