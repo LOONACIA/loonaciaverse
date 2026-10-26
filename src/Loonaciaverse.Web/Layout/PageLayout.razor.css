@@ -1,0 +1,21 @@
+.page-layout {
+    min-height: 100dvh;
+    background-color: var(--color-bg);
+    background-image:
+        radial-gradient(circle at 24px 38px, rgba(230, 238, 247, 0.28) 1px, transparent 1.5px),
+        radial-gradient(circle at 107px 151px, rgba(95, 212, 255, 0.2) 1px, transparent 1.5px),
+        radial-gradient(circle at 193px 83px, rgba(230, 238, 247, 0.16) 0.75px, transparent 1.25px);
+    background-size: 307px 293px, 433px 397px, 563px 487px;
+}
+
+main {
+    width: min(100% - 3rem, 80rem);
+    margin-inline: auto;
+    padding-block: clamp(3rem, 8vw, 7rem);
+}
+
+@media (max-width: 600px) {
+    main {
+        width: calc(100% - 2rem);
+    }
+}

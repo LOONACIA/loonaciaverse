@@ -1,4 +1,6 @@
+using System.Reflection;
 using System.Text.RegularExpressions;
+using Loonaciaverse.Web;
 
 namespace Loonaciaverse.Web.Tests;
 
@@ -30,7 +32,7 @@ public class StaticAssetTests
     }
 
     [Fact]
-    public void IndexLinksExistingThemeAndPretendardStylesheets()
+    public void IndexLinksExistingThemePretendardAndGeneratedIsolationStylesheets()
     {
         var webRoot = ContentBuildIntegrationTests.FindWebRoot();
         var html = File.ReadAllText(Path.Combine(webRoot, "index.html"));
@@ -47,11 +49,26 @@ public class StaticAssetTests
             Assert.True(href.Success, $"Stylesheet link has no href: {link.Value}");
             var path = href.Groups["href"].Value.Replace("#[.{fingerprint}]", "");
             stylesheets.Add(path);
-            AssertFileInsideWebRoot(webRoot, Path.GetFullPath(Path.Combine(webRoot, path)));
+            if (path == "Loonaciaverse.Web.styles.css")
+            {
+                var configuration = typeof(App).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()!.Configuration;
+                var intermediateRoot = Path.GetFullPath(Path.Combine(webRoot, "..", "obj", configuration));
+                var bundle = Assert.Single(Directory.EnumerateFiles(intermediateRoot, path, SearchOption.AllDirectories), file => Path.GetFileName(Path.GetDirectoryName(file)) == "bundle");
+                var css = File.ReadAllText(bundle);
+                Assert.Contains("Components/TopBar.razor.rz.scp.css", css);
+                Assert.Contains("Components/LostInSpace.razor.rz.scp.css", css);
+                Assert.Contains("Layout/PageLayout.razor.rz.scp.css", css);
+            }
+            else
+            {
+                AssertFileInsideWebRoot(webRoot, Path.GetFullPath(Path.Combine(webRoot, path)));
+            }
         }
 
         Assert.Contains("css/app.css", stylesheets);
         Assert.Contains("fonts/pretendard/pretendardvariable-dynamic-subset.css", stylesheets);
+        Assert.Contains("Loonaciaverse.Web.styles.css", stylesheets);
+        Assert.True(stylesheets.IndexOf("css/app.css") < stylesheets.IndexOf("Loonaciaverse.Web.styles.css"));
     }
 
     [Theory]

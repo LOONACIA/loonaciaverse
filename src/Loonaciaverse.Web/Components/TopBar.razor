@@ -1,0 +1,54 @@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+<header class="top-bar">
+    <a class="logo" href="@LogoHref">LOONACIAVERSE</a>
+    <nav aria-label="주요 메뉴">
+        @foreach (var section in Sections)
+        {
+            <a href="@($"/{section}")" class="@(currentSection == section ? "active" : null)" aria-current="@(currentSection == section ? "page" : null)">@section.ToUpperInvariant()</a>
+        }
+        @if (currentSection == "blog")
+        {
+            <a class="rss" href="/feed.xml" target="_top" aria-label="RSS">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+                    <circle cx="5" cy="19" r="1" fill="currentColor" />
+                    <path d="M4 11a9 9 0 0 1 9 9M4 4a16 16 0 0 1 16 16" />
+                </svg>
+            </a>
+        }
+    </nav>
+</header>
+
+@code {
+    private static readonly string[] Sections = ["projects", "blog", "about"];
+    private string? currentSection;
+    private string LogoHref => currentSection is null ? "/" : $"/?focus={currentSection}";
+
+    protected override void OnInitialized()
+    {
+        UpdateCurrentSection();
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private void UpdateCurrentSection()
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0];
+        var section = path.Split('/')[0];
+        currentSection = Sections.Contains(section) ? section : null;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(() =>
+        {
+            UpdateCurrentSection();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+}
