@@ -1,0 +1,169 @@
+@font-face {
+    font-family: "Michroma";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/michroma/michroma-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Rajdhani";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("../fonts/rajdhani/rajdhani-latin-400-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Rajdhani";
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url("../fonts/rajdhani/rajdhani-latin-500-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Rajdhani";
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url("../fonts/rajdhani/rajdhani-latin-600-normal.woff2") format("woff2");
+}
+
+@font-face {
+    font-family: "Rajdhani";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("../fonts/rajdhani/rajdhani-latin-700-normal.woff2") format("woff2");
+}
+
+:root {
+    color-scheme: dark;
+    --color-bg: #05070d;
+    --color-surface: rgba(11, 18, 32, 0.8);
+    --color-hud: #5fd4ff;
+    --color-hud-dim: rgba(95, 212, 255, 0.35);
+    --color-text: #e6eef7;
+    --color-text-muted: #8a9bb0;
+    --color-locked: #ffb347;
+    --color-danger: #ff5f6d;
+    --font-display: "Michroma", sans-serif;
+    --font-hud: "Rajdhani", sans-serif;
+    --font-body: "Pretendard Variable", Pretendard, system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    line-height: 1.75;
+}
+
+a {
+    color: var(--color-hud);
+}
+
+:focus-visible {
+    outline: 2px solid var(--color-hud);
+    outline-offset: 4px;
+}
+
+.hud-label {
+    color: var(--color-hud);
+    font-family: var(--font-hud);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.hud-frame {
+    position: relative;
+    border: 1px solid var(--color-hud-dim);
+    background: var(--color-surface);
+}
+
+.hud-frame::before,
+.hud-frame::after {
+    position: absolute;
+    inset: -1px;
+    content: "";
+    pointer-events: none;
+    background:
+        linear-gradient(var(--color-hud), var(--color-hud)) left top / 12px 1px no-repeat,
+        linear-gradient(var(--color-hud), var(--color-hud)) right bottom / 12px 1px no-repeat,
+        linear-gradient(var(--color-hud), var(--color-hud)) left top / 1px 12px no-repeat,
+        linear-gradient(var(--color-hud), var(--color-hud)) right bottom / 1px 12px no-repeat;
+}
+
+.hud-frame::after {
+    transform: scaleX(-1);
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.6rem;
+    border: 1px solid var(--color-hud-dim);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    text-decoration: none;
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.45rem;
+    border: 1px solid currentColor;
+    color: var(--color-text-muted);
+    font-family: var(--font-hud);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.badge-draft {
+    color: var(--color-locked);
+}
+
+.badge-featured {
+    color: var(--color-hud);
+}
+
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1000;
+    padding: 1rem 3rem 1rem 1.25rem;
+    border-top: 1px solid var(--color-danger);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+#blazor-error-ui .reload {
+    margin-left: 1rem;
+    color: var(--color-danger);
+}
+
+#blazor-error-ui .dismiss {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    color: var(--color-danger);
+    cursor: pointer;
+}

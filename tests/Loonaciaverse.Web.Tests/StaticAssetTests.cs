@@ -1,0 +1,83 @@
+using System.Text.RegularExpressions;
+
+namespace Loonaciaverse.Web.Tests;
+
+public class StaticAssetTests
+{
+    [Theory]
+    [InlineData("css/app.css")]
+    [InlineData("fonts/pretendard/pretendardvariable-dynamic-subset.css")]
+    public void StylesheetRelativeUrlsResolveToFilesInsideWebRoot(string stylesheet)
+    {
+        var webRoot = ContentBuildIntegrationTests.FindWebRoot();
+        var cssPath = Path.Combine(webRoot, stylesheet);
+        var css = File.ReadAllText(cssPath);
+        var urls = Regex.Matches(css, """url\(\s*['"]?(?<url>[^'"\s)]+)['"]?\s*\)""");
+
+        Assert.NotEmpty(urls);
+
+        foreach (Match match in urls)
+        {
+            var url = match.Groups["url"].Value;
+            if (url.StartsWith('/') || url.StartsWith('#') || Uri.TryCreate(url, UriKind.Absolute, out _))
+            {
+                continue;
+            }
+
+            var path = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(cssPath)!, Uri.UnescapeDataString(url.Split('?', '#')[0])));
+            AssertFileInsideWebRoot(webRoot, path);
+        }
+    }
+
+    [Fact]
+    public void IndexLinksExistingThemeAndPretendardStylesheets()
+    {
+        var webRoot = ContentBuildIntegrationTests.FindWebRoot();
+        var html = File.ReadAllText(Path.Combine(webRoot, "index.html"));
+        var stylesheets = new List<string>();
+
+        foreach (Match link in Regex.Matches(html, @"<link\b[^>]*>", RegexOptions.IgnoreCase))
+        {
+            if (!Regex.IsMatch(link.Value, """\brel\s*=\s*['"]stylesheet['"]""", RegexOptions.IgnoreCase))
+            {
+                continue;
+            }
+
+            var href = Regex.Match(link.Value, """\bhref\s*=\s*['"](?<href>[^'"]+)['"]""", RegexOptions.IgnoreCase);
+            Assert.True(href.Success, $"Stylesheet link has no href: {link.Value}");
+            var path = href.Groups["href"].Value.Replace("#[.{fingerprint}]", "");
+            stylesheets.Add(path);
+            AssertFileInsideWebRoot(webRoot, Path.GetFullPath(Path.Combine(webRoot, path)));
+        }
+
+        Assert.Contains("css/app.css", stylesheets);
+        Assert.Contains("fonts/pretendard/pretendardvariable-dynamic-subset.css", stylesheets);
+    }
+
+    [Theory]
+    [InlineData("--color-bg", "#05070d")]
+    [InlineData("--color-surface", "rgba(11, 18, 32, 0.8)")]
+    [InlineData("--color-hud", "#5fd4ff")]
+    [InlineData("--color-hud-dim", "rgba(95, 212, 255, 0.35)")]
+    [InlineData("--color-text", "#e6eef7")]
+    [InlineData("--color-text-muted", "#8a9bb0")]
+    [InlineData("--color-locked", "#ffb347")]
+    [InlineData("--color-danger", "#ff5f6d")]
+    public void RootDefinesDesignColorTokenWithSpecifiedValue(string token, string expectedValue)
+    {
+        var css = File.ReadAllText(Path.Combine(ContentBuildIntegrationTests.FindWebRoot(), "css", "app.css"));
+        var root = Assert.Single(Regex.Matches(css, @":root\s*\{(?<body>[^}]*)\}").Cast<Match>());
+        var declaration = Assert.Single(Regex.Matches(root.Groups["body"].Value, $@"{Regex.Escape(token)}\s*:\s*(?<value>[^;]+);").Cast<Match>());
+
+        Assert.Equal(expectedValue, declaration.Groups["value"].Value.Trim());
+    }
+
+    private static void AssertFileInsideWebRoot(string webRoot, string path)
+    {
+        var relativePath = Path.GetRelativePath(webRoot, path);
+        Assert.False(Path.IsPathRooted(relativePath), $"Asset is outside wwwroot: {path}");
+        Assert.NotEqual("..", relativePath);
+        Assert.False(relativePath.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal), $"Asset is outside wwwroot: {path}");
+        Assert.True(File.Exists(path), $"Expected static asset: {path}");
+    }
+}
