@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using AngleSharp.Html.Parser;
 using Loonaciaverse.Web;
 
 namespace Loonaciaverse.Web.Tests;
@@ -87,6 +88,46 @@ public class StaticAssetTests
         var declaration = Assert.Single(Regex.Matches(root.Groups["body"].Value, $@"{Regex.Escape(token)}\s*:\s*(?<value>[^;]+);").Cast<Match>());
 
         Assert.Equal(expectedValue, declaration.Groups["value"].Value.Trim());
+    }
+
+    [Theory]
+    [InlineData("#app")]
+    [InlineData("noscript")]
+    public void BootScreenAndNoscriptLinkToDetailPagesInOrder(string selector)
+    {
+        var html = File.ReadAllText(Path.Combine(ContentBuildIntegrationTests.FindWebRoot(), "index.html"));
+        var document = new HtmlParser(new HtmlParserOptions { IsScripting = false }).ParseDocument(html);
+        var container = document.QuerySelector(selector);
+        Assert.NotNull(container);
+        var links = container.QuerySelectorAll("a");
+
+        Assert.Equal(new[] { "/projects", "/blog", "/about" }, links.Select(link => link.GetAttribute("href")));
+        Assert.Equal(new[] { "PROJECTS", "BLOG", "ABOUT" }, links.Select(link => link.TextContent.Trim()));
+    }
+
+    [Fact]
+    public void BootScreenContainsNavigationSystemBootLabelAndSeparateNoscriptNotice()
+    {
+        var html = File.ReadAllText(Path.Combine(ContentBuildIntegrationTests.FindWebRoot(), "index.html"));
+        var document = new HtmlParser(new HtmlParserOptions { IsScripting = false }).ParseDocument(html);
+        var app = document.QuerySelector("#app");
+        Assert.NotNull(app);
+
+        Assert.Contains("NAVIGATION SYSTEM BOOT", app.TextContent);
+        Assert.Null(app.QuerySelector("noscript"));
+        var noscript = document.QuerySelector("body > noscript");
+        Assert.NotNull(noscript);
+        Assert.Contains("이 사이트는 JavaScript가 필요합니다.", noscript.TextContent);
+    }
+
+    [Theory]
+    [InlineData("width: var(--blazor-load-percentage, 0%);")]
+    [InlineData("content: var(--blazor-load-percentage-text, \"0%\");")]
+    public void BootGaugeUsesBlazorLoadVariablesWithInitialFallbacks(string declaration)
+    {
+        var css = File.ReadAllText(Path.Combine(ContentBuildIntegrationTests.FindWebRoot(), "css", "app.css"));
+
+        Assert.Contains(declaration, css);
     }
 
     private static void AssertFileInsideWebRoot(string webRoot, string path)

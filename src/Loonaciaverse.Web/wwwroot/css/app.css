@@ -315,3 +315,80 @@ a {
     color: var(--color-danger);
     cursor: pointer;
 }
+
+.boot-screen {
+    display: flex;
+    min-height: 100dvh;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+}
+
+.boot-title {
+    margin: 0;
+    color: var(--color-text);
+    font-family: var(--font-display);
+    font-size: clamp(1.1rem, 4vw, 2.5rem);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+}
+
+.boot-label {
+    margin: 0.75rem 0 2rem;
+}
+
+.boot-progress {
+    width: min(100%, 20rem);
+}
+
+.boot-gauge {
+    height: 0.375rem;
+    overflow: hidden;
+    border: 1px solid var(--color-hud-dim);
+    background: var(--color-surface);
+}
+
+.boot-gauge-fill {
+    width: var(--blazor-load-percentage, 0%);
+    height: 100%;
+    background: var(--color-hud);
+}
+
+.boot-percentage {
+    margin: 0.5rem 0 1.5rem;
+    color: var(--color-hud);
+    font-family: var(--font-hud);
+    font-variant-numeric: tabular-nums;
+}
+
+.boot-percentage::after {
+    content: var(--blazor-load-percentage-text, "0%");
+}
+
+.boot-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-hud);
+    font-size: 0.875rem;
+    letter-spacing: 0.12em;
+}
+
+.boot-noscript {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    padding: 1rem;
+    border-top: 1px solid var(--color-hud-dim);
+    background: var(--color-surface);
+    text-align: center;
+}
+
+.boot-noscript p {
+    margin: 0 0 0.5rem;
+}

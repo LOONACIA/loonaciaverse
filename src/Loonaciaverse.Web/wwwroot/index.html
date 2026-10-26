@@ -14,7 +14,37 @@
 </head>
 
 <body>
-    <div id="app">Loading...</div>
+    <div id="app">
+        <main class="boot-screen">
+            <h1 class="boot-title">LOONACIAVERSE</h1>
+            <p class="boot-label hud-label" id="boot-status">NAVIGATION SYSTEM BOOT</p>
+            <div class="boot-progress" aria-labelledby="boot-status">
+                <div class="boot-gauge" aria-hidden="true">
+                    <div class="boot-gauge-fill"></div>
+                </div>
+                <p class="boot-percentage"></p>
+            </div>
+            <nav class="boot-links" aria-label="바로 가기">
+                <a href="/projects">PROJECTS</a>
+                <span aria-hidden="true">·</span>
+                <a href="/blog">BLOG</a>
+                <span aria-hidden="true">·</span>
+                <a href="/about">ABOUT</a>
+            </nav>
+        </main>
+    </div>
+    <noscript>
+        <div class="boot-noscript">
+            <p>이 사이트는 JavaScript가 필요합니다.</p>
+            <nav class="boot-links" aria-label="바로 가기">
+                <a href="/projects">PROJECTS</a>
+                <span aria-hidden="true">·</span>
+                <a href="/blog">BLOG</a>
+                <span aria-hidden="true">·</span>
+                <a href="/about">ABOUT</a>
+            </nav>
+        </div>
+    </noscript>
     <div id="blazor-error-ui">
         An unhandled error has occurred.
         <a href="." class="reload">Reload</a>
