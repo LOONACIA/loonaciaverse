@@ -1,0 +1,24 @@
+@page "/projects"
+@layout PageLayout
+@inject IContentService ContentService
+
+<PageTitle>PROJECTS · LOONACIAVERSE</PageTitle>
+
+<ContentLoader TItem="IReadOnlyList<ProjectSummary>" Load="async cancellationToken => await ContentService.GetProjectsAsync(cancellationToken)" Context="projects">
+    <section class="projects-page">
+        <PageHeader BodyId="projects" Title="PROJECTS" />
+        @if (projects.Count == 0)
+        {
+            <p class="projects-empty">아직 공개한 프로젝트가 없습니다.</p>
+        }
+        else
+        {
+            <ul class="projects-grid" aria-label="프로젝트">
+                @foreach (var project in projects)
+                {
+                    <li><ProjectCard Project="project" /></li>
+                }
+            </ul>
+        }
+    </section>
+</ContentLoader>

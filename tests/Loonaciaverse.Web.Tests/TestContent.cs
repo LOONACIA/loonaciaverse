@@ -4,6 +4,18 @@ namespace Loonaciaverse.Web.Tests;
 
 public static class TestContent
 {
+    public static ProjectDetail Project() => new(
+        Projects()[0] with { Thumbnail = "/images/project-hero.webp", Draft = true },
+        "<h2>개요</h2><p>문제를 <strong>해결합니다</strong>.</p><pre><code class=\"language-csharp\">var result = 1;</code></pre>");
+
+    public static IReadOnlyList<ProjectSummary> Projects() =>
+    [
+        new("first-project", "첫 번째 프로젝트", "서비스 순서를 따릅니다.", "2024.01 ~ 진행 중", "기획 및 개발", ["C#", "게임 개발"],
+            new Dictionary<string, string> { ["github"] = "https://github.com/example/project", ["demo"] = "https://example.com/demo" }, "/images/project.webp", false, 20, false),
+        new("featured-project", "대표 프로젝트", "대표 프로젝트 소개입니다.", "2025.02 ~ 2025.06", "클라이언트 개발", ["Unity", "C#"], new Dictionary<string, string>(), null, true, 10, true),
+        new("last-project", "마지막 프로젝트", "마지막 프로젝트 소개입니다.", "2026.03", "개발", ["Blazor"], new Dictionary<string, string>(), null, false, 0, false)
+    ];
+
     public static PostDetail Post() => new(
         Posts()[0] with { Updated = new DateOnly(2026, 10, 20), Draft = true, Cover = "/images/post-cover.webp" },
         "<h2 id=\"소개\">소개</h2><p>함께 <strong>기록합니다</strong>.</p><pre><code class=\"language-csharp\">var value = 1;</code></pre>",

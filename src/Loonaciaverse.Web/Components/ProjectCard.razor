@@ -1,0 +1,40 @@
+<a class="project-card" href="/projects/@Project.Slug">
+    @if (Project.Thumbnail is { } thumbnail)
+    {
+        <img class="project-thumbnail" src="@thumbnail" alt="" loading="lazy" />
+    }
+    else
+    {
+        <div class="project-thumbnail project-placeholder" aria-hidden="true"></div>
+    }
+    <div class="project-card-content">
+        @if (Project.Featured || Project.Draft)
+        {
+            <div class="project-badges">
+                @if (Project.Featured)
+                {
+                    <span class="badge badge-featured">FEATURED</span>
+                }
+                @if (Project.Draft)
+                {
+                    <span class="badge badge-draft">DRAFT</span>
+                }
+            </div>
+        }
+        <h2>@Project.Title</h2>
+        <p class="project-period">@Project.Period</p>
+        <p class="project-role">@Project.Role</p>
+        <ul class="project-stack" aria-label="기술 스택">
+            @foreach (var stack in Project.Stack)
+            {
+                <li class="chip">@stack</li>
+            }
+        </ul>
+        <p class="project-summary">@Project.Summary</p>
+    </div>
+</a>
+
+@code {
+    [Parameter, EditorRequired]
+    public ProjectSummary Project { get; set; } = default!;
+}

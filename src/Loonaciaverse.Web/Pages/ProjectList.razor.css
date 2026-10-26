@@ -1,0 +1,32 @@
+.projects-page {
+    font-family: var(--font-body);
+}
+
+.projects-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.projects-grid > li {
+    min-width: 0;
+}
+
+.projects-empty {
+    color: var(--color-text-muted);
+}
+
+@media (min-width: 700px) {
+    .projects-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .projects-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}

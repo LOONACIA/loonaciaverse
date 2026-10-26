@@ -1,0 +1,60 @@
+@page "/projects/{Slug}"
+@layout PageLayout
+@inject IContentService ContentService
+
+<ContentLoader @key="Slug" TItem="Loonaciaverse.Core.Content.ProjectDetail" Load="cancellationToken => ContentService.GetProjectAsync(Slug, cancellationToken)" Context="project">
+    <PageTitle>@project.Meta.Title · LOONACIAVERSE</PageTitle>
+    <article class="project-detail">
+        @if (project.Meta.Thumbnail is { } thumbnail)
+        {
+            <img class="project-hero" src="@thumbnail" alt="" />
+        }
+        <PageHeader BodyId="projects" Title="@project.Meta.Title">
+            @if (project.Meta.Draft)
+            {
+                <span class="badge badge-draft">DRAFT</span>
+            }
+        </PageHeader>
+        <dl class="hud-frame">
+            <div class="project-meta-row">
+                <dt class="hud-label">PERIOD</dt>
+                <dd>@project.Meta.Period</dd>
+            </div>
+            <div class="project-meta-row">
+                <dt class="hud-label">ROLE</dt>
+                <dd>@project.Meta.Role</dd>
+            </div>
+            <div class="project-meta-row">
+                <dt class="hud-label">STACK</dt>
+                <dd>
+                    <ul class="project-stack" aria-label="기술 스택">
+                        @foreach (var stack in project.Meta.Stack)
+                        {
+                            <li class="chip">@stack</li>
+                        }
+                    </ul>
+                </dd>
+            </div>
+            @if (project.Meta.Links.Count > 0)
+            {
+                <div class="project-meta-row">
+                    <dt class="hud-label">LINKS</dt>
+                    <dd>
+                        <ul class="project-links">
+                            @foreach (var link in project.Meta.Links)
+                            {
+                                <li><a href="@link.Value" target="_blank" rel="noopener noreferrer">@link.Key.ToUpperInvariant()</a></li>
+                            }
+                        </ul>
+                    </dd>
+                </div>
+            }
+        </dl>
+        <ContentBody Html="@project.Html" />
+    </article>
+</ContentLoader>
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+}
