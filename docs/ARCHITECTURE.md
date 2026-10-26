@@ -15,7 +15,12 @@ loonaciaverse/
 │  ├─ Loonaciaverse.Core/            # 콘텐츠 모델(record), IContentService. 외부 의존성 없음
 │  └─ Loonaciaverse.Web/             # Blazor WASM Standalone
 │     ├─ Pages/                      # 라우트 컴포넌트 (Home, BlogList, BlogPost, ProjectList, ProjectDetail, About, NotFound)
-│     ├─ Components/                 # HUD, 상단 바, 목록형 홈, 카드 등
+│     ├─ Components/
+│     │  ├─ StarSystem.razor         # 씬 수명주기, URL 포커스, 키보드 입력, HUD·목록형 홈 전환
+│     │  ├─ HudPanel.razor           # HUD 패널, 닫기·TRAVEL 버튼
+│     │  ├─ BodyInfo.razor           # HUD와 목록형 홈이 공유하는 천체 정보
+│     │  ├─ ListHome.razor           # 씬을 쓸 수 없을 때의 카드 목록
+│     │  └─ ...                      # 상단 바, 콘텐츠 카드 등
 │     ├─ Services/                   # HttpContentService, SceneInterop
 │     └─ wwwroot/
 │        ├─ index.html               # 부팅 화면 마크업, 정적 링크, 공통 OG
@@ -27,10 +32,21 @@ loonaciaverse/
 ├─ tools/
 │  └─ Loonaciaverse.ContentBuilder/  # 콘솔: content/ → wwwroot/content/ (Markdig, YamlDotNet)
 ├─ scene/                            # npm 프로젝트: TypeScript + Vite + Vitest
-│  ├─ src/scene/                     # Three.js 씬 (진입점 scene.ts)
+│  ├─ src/scene/
+│  │  ├─ scene.ts                   # 공개 계약, 렌더 루프, 입력, 블룸·패럴랙스, 수명주기
+│  │  ├─ types.ts                   # UniverseDto, BodyDto, DotNetCallbacks
+│  │  ├─ system.ts                  # 천체·별 필드·성운 생성, 자전, 셰이더 시간, 별 궤적
+│  │  ├─ materials.ts               # 천체 표면·대기·코로나·성운의 절차적 셰이더
+│  │  ├─ labels.ts                  # CSS2D 이름표, 클릭·호버, 표시 상태
+│  │  ├─ ring.ts                    # 포커스 홀로그램 링, 회전·페이드
+│  │  ├─ orbit.ts                   # 공전 위치·시간·정지 조건
+│  │  ├─ camera.ts                  # 화면 비별 카메라 구도, 보간·트윈
+│  │  ├─ warp.ts                    # 900ms 워프 타임라인
+│  │  ├─ quality.ts                 # 품질 단계 선택, 패럴랙스 각도 계산
+│  │  └─ *.test.ts                  # Vitest 테스트
 │  ├─ src/highlight.ts               # highlight.js 래퍼 (필요한 언어만 등록)
 │  ├─ src/toc.ts                     # 목차 클릭 스크롤
-│  └─ sandbox/                       # Blazor 없이 씬만 띄우는 Vite 개발 서버 페이지
+│  └─ sandbox/                       # index.html, main.ts: Blazor 없이 씬을 확인하는 Vite 페이지
 ├─ content/
 │  ├─ site.yml                       # 사이트 제목, baseUrl, 작성자
 │  ├─ universe.yml                   # 천체 정의
@@ -44,6 +60,7 @@ loonaciaverse/
 └─ docs/
 ```
 `[빌드 산출물]` 경로는 모두 `.gitignore`에 넣는다.
+저장소 루트에서 `npm run dev --prefix scene`으로 sandbox를 실행한다. 천체별 FOCUS·HIGHLIGHT·WARP, CLEAR와 immediate 옵션으로 씬을 확인하며, 워프 완료 1초 뒤 씬을 다시 초기화한다.
 
 ## 레이어 규칙
 - 의존 방향: `Web → Core`, `ContentBuilder → Core`, 테스트 → 각 대상. Core는 아무것도 참조하지 않는다. 이유: 나중에 Web App 서버를 추가할 때 서버도 Core만 참조하면 된다.
@@ -52,7 +69,7 @@ loonaciaverse/
 - 서비스 등록은 `Program`의 정적 메서드 `ConfigureServices` 한 곳에 모은다. 이유: BlazorWasmPreRendering.Build가 이 형태를 요구한다. 도입할 때 README에서 정확한 시그니처를 확인한다.
 - Three.js 코드는 `scene/`에만 있다. C# 쪽은 `SceneInterop` 하나만 씬 모듈을 import하고 호출한다. 페이지가 `IJSRuntime`으로 씬 함수를 직접 부르지 않는다.
 - HUD는 Blazor가 그린다. 예외로 천체 이름표는 매 프레임 3D 위치를 따라가야 하므로 씬 모듈이 CSS2DRenderer로 관리한다(ADR-003).
-- 씬은 상태를 갖지 않는 렌더러다. "어떤 천체가 선택됐는가"의 유일한 원천은 URL(`?focus=`)이고, 이를 Blazor Home 페이지가 해석해 씬에 명령한다. 씬은 클릭과 호버 이벤트만 C#으로 알린다.
+- "어떤 천체가 선택됐는가"의 유일한 원천은 URL(`?focus=`)이고, 이를 홈의 `StarSystem` 컴포넌트가 해석해 씬에 명령한다. 씬은 렌더링에 필요한 포커스·호버·강조·애니메이션 상태를 보관하며, C#에는 클릭만 알린다. 호버와 그에 따른 이름표 강조·공전 정지는 씬 내부에서 처리한다.
 
 ## 콘텐츠 모델 (Core)
 초안이며 구현하면서 조정할 수 있다. 바뀌면 이 절을 고친다.
@@ -106,12 +123,20 @@ dotnet build src/Loonaciaverse.Web
 ```
 index.html(부팅 화면) → Blazor 부팅 → Home 페이지
  → IContentService.GetUniverseAsync()
- → SceneInterop.InitAsync(canvas, universe)   # WebGL 불가 또는 reduced-motion이면 목록형 홈
- → URL ?focus 해석 → SceneInterop.FocusAsync(id) / ClearFocusAsync()
- ← 씬 이벤트(OnBodyClicked, OnBodyHovered) → NavigationManager로 ?focus 갱신
+ → StarSystem(Universe): 씬 호스트와 Blazor HUD 관리
+ → 첫 렌더 후 SceneInterop.InitAsync(container, universe)
+    # WebGL2 불가·reduced-motion·씬 모듈 import 실패 시 ListHome
+ ← 씬 OnBodyClicked(id | null) → StarSystem → NavigationManager로 ?focus 갱신 또는 닫기
+ → URL ?focus 해석 → HudPanel 표시 + SceneInterop.FocusAsync(id, immediate) / ClearFocusAsync()
+ → 천체 버튼 키보드 포커스 → SceneInterop.HighlightAsync(id | null)
  → TRAVEL → SceneInterop.WarpAsync(id)가 끝나면 NavigateTo(route)
- → Home Dispose → SceneInterop.DisposeAsync()
+ → StarSystem Dispose → SceneInterop.DisposeAsync()
 ```
+- `Home`은 콘텐츠 로드와 페이지 메타데이터를 맡고, `StarSystem`은 씬·HUD·키보드 입력·목록형 fallback을 맡는다. `HudPanel`과 `ListHome`은 `BodyInfo`를 공유하므로 같은 천체 정보와 링크를 보여 준다.
+- `SceneInterop`은 DI에 등록하지 않고 `StarSystem`이 `new SceneInterop(JS)`로 생성한다. 씬 컨테이너와 JS 모듈·`DotNetObjectReference`의 수명을 컴포넌트에 맞추고, 홈을 벗어날 때 이벤트 구독과 씬 리소스를 함께 해제하기 위해서다.
+- `StarSystem`은 현재 URL의 `focus`를 천체 목록과 대조하며, 알 수 없는 값은 `/`로 replace한다. 최초 적용은 `immediate: true`로 직접 진입 시 줌인 트윈을 생략하고, 이후 URL 변경에는 포커스·해제 트윈을 적용한다.
+- OVERVIEW에서 천체를 선택하면 포커스 URL을 push하고 `NavigationOptions.HistoryEntryState`에 `loonaciaverse:home-focus` 마커를 넣는다. 다른 천체로 바꾸면 현재 항목을 replace하며 기존 `HistoryEntryState`를 보존한다. ✕·Esc·빈 공간 클릭으로 닫을 때 현재 항목에 마커가 있으면 `history.back()`을 호출하고, 직접 진입처럼 마커가 없으면 `/`로 replace한다. 브라우저 뒤로가기도 URL 변경을 통해 씬과 HUD에 반영한다.
+- TRAVEL은 잠기지 않고 라우트가 있는 천체에서만 동작한다. 워프 중에는 HUD를 숨기고 입력과 URL 변경의 반영을 차단하며, 연출이 실패해도 상세 페이지로 이동한다. 목록형 홈은 워프 없이 일반 링크로 이동한다.
 
 **런타임: 상세**
 ```
@@ -121,14 +146,19 @@ index.html(부팅 화면) → Blazor 부팅 → Home 페이지
 
 ## 씬 모듈 계약 (`scene/src/scene/scene.ts`)
 ```ts
-export function init(canvas: HTMLCanvasElement, universe: UniverseDto, callbacks: DotNetObjectRef): boolean; // WebGL 불가면 false
+export function init(container: HTMLElement, universe: UniverseDto, callbacks: DotNetCallbacks): boolean; // WebGL2 불가 또는 reduced-motion이면 false
 export function focus(bodyId: string, immediate: boolean): void;
 export function clearFocus(): void;
-export function warp(bodyId: string): Promise<void>;  // 1초 이내에 resolve
+export function highlight(bodyId: string | null): void;
+export function warp(bodyId: string): Promise<void>; // 900ms 타이머로 1초 이내에 resolve
 export function dispose(): void;
 ```
-C# 콜백: `[JSInvokable] OnBodyClicked(string id)`, `[JSInvokable] OnBodyHovered(string? id)`.
-카메라 트윈 계산, 공전 위치 계산, URL↔포커스 변환 같은 순수 로직은 Three.js에 의존하지 않는 별도 모듈로 분리해 Vitest로 테스트한다.
+- `init`은 이전 씬을 dispose한 뒤 컨테이너 안에 캔버스와 CSS2D 이름표 레이어를 만든다. 렌더러 생성 실패도 `false`로 반환한다. `ResizeObserver`로 크기를 맞추고, `visibilitychange`로 숨겨진 탭의 렌더 루프를 멈춘다.
+- `focus`는 `immediate`가 true이면 즉시, false이면 0.8초 트윈으로 천체에 접근한다. `clearFocus`는 0.8초 트윈으로 전체 구도로 돌아간다. `highlight`는 키보드로 강조할 천체를 지정하며 `null`로 해제한다. 포커스·호버·키보드 강조 중에는 공전을 멈추지만 자전과 셰이더 시간은 계속 흐른다.
+- C# 콜백은 `SceneInterop`의 `[JSInvokable] public Task OnBodyClicked(string? id)` 하나다. `null`은 빈 공간 클릭이며, 이름표 클릭도 같은 콜백으로 전달한다. 호버 콜백은 없고 씬 내부에서만 처리한다.
+- `warp`는 카메라 돌진·별 궤적·배경색 페이드를 실행한다. 완료는 `requestAnimationFrame`에 의존하지 않는 `setTimeout(..., 900)`으로 resolve하므로 렌더 루프가 멈춰도 완료를 기다릴 수 있다. 워프를 시작하면 입력과 포커스·강조 명령을 무시하고 이름표·링·패럴랙스를 숨기거나 끈다. 반복 호출은 진행 중인 Promise를 반환하며, 씬이 없거나 id가 유효하지 않으면 즉시 resolve한다.
+- `dispose`는 렌더 루프·이벤트·observer·DOM·GPU 리소스·블룸 패스를 해제하고, 진행 중인 워프 타이머를 취소하며 Promise도 resolve한다. 다시 초기화하거나 여러 번 해제할 수 있다.
+- Three.js에 의존하지 않는 순수 로직 모듈은 `orbit.ts`(공전 위치, 공전 시계, 정지 조건), `camera.ts`(전체·포커스 구도, easing, 보간, 트윈), `warp.ts`(돌진·궤적·페이드 타임라인), `quality.ts`(품질 단계, 패럴랙스 각도)다. `labels.ts`의 표시 상태와 `ring.ts`의 불투명도 목표·페이드 계산도 순수 함수로 검증한다. URL↔포커스와 history 규칙은 `StarSystem`의 책임이다.
 
 ## 횡단 관심사
 - **에러 처리**:
@@ -151,9 +181,10 @@ C# 콜백: `[JSInvokable] OnBodyClicked(string id)`, `[JSInvokable] OnBodyHovere
 | 대상 | 도구 | 명령 |
 |---|---|---|
 | ContentBuilder (front matter 파싱, 검증 실패, 인덱스·RSS·sitemap·TOC 생성, 초안 제외) | xUnit | `dotnet test` |
-| Web 컴포넌트 (HUD 스탯 표시, 잠긴 행성, 상단 바, 목록·상세 렌더, 404) | bUnit + 가짜 `IContentService` | `dotnet test` |
-| 씬 순수 로직 (트윈, 공전, URL↔포커스) | Vitest | `npm test --prefix scene` |
-| 3D 렌더링 결과, 연출 | 수동 확인(sandbox, 실제 사이트) | - |
+| Web 컴포넌트·SceneInterop (URL↔포커스, history·닫기, 키보드 순환·DOM 포커스, TRAVEL·실패 시 이동, fallback·수명주기, HUD 스탯·잠금, 상단 바, 목록·상세 렌더, 404) | bUnit + 가짜 `IContentService`·JS interop | `dotnet test` |
+| 씬 순수 로직 (공전 위치·시간·정지 조건, 카메라 구도·보간·트윈, 워프 타임라인, 품질 단계·패럴랙스 각도, 이름표 상태·링 페이드) | Vitest | `npm test --prefix scene` |
+| 씬 구성·계약 (천체·별·셰이더 uniforms, 이름표·링, 클릭·호버·강조, 워프 타이머·입력 차단, resize·블룸·dispose) | Vitest + happy-dom, 렌더러·composer 모의 객체 | `npm test --prefix scene` |
+| 3D 렌더링 결과, 셰이더 표현, 연출 | 수동 확인(sandbox, 실제 사이트) | `npm run dev --prefix scene` |
 
 ## CI/CD (`.github/workflows/`)
 - **PR**: `dotnet test`, `npm test --prefix scene`
