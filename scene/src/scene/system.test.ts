@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Mesh, MeshBasicMaterial, MeshStandardMaterial, PointLight, Points, SphereGeometry } from "three";
+import { Color, Light, LineSegments, Mesh, PlaneGeometry, Points, ShaderMaterial, SphereGeometry, Vector3 } from "three";
+import type { BufferGeometry, Material } from "three";
 import { createSystem } from "./system";
 import type { UniverseDto } from "./types";
 
@@ -40,7 +41,7 @@ afterEach(() => {
 describe("createSystem", () => {
   it("creates one sphere mesh per body with its data ID", () => {
     const { scene, bodies } = makeSystem();
-    expect(scene.children.filter((child) => child instanceof Mesh)).toHaveLength(universe.bodies.length);
+    expect(scene.children.filter((child) => child.userData.bodyId)).toHaveLength(universe.bodies.length);
     expect(bodies.map((mesh) => mesh.userData.bodyId)).toEqual(universe.bodies.map((body) => body.id));
     expect(bodies.every((mesh) => mesh.geometry instanceof SphereGeometry)).toBe(true);
   });
@@ -50,14 +51,15 @@ describe("createSystem", () => {
     update(30);
     const star = bodies[1];
     expect(star.position.toArray()).toEqual([0, 0, 0]);
-    expect(star.material).toBeInstanceOf(MeshBasicMaterial);
-    expect(bodies[0].material).toBeInstanceOf(MeshStandardMaterial);
-    expect(star.material.color.getHexString()).toBe("fff2cc");
+    expect(star.material).toBeInstanceOf(ShaderMaterial);
+    expect(star.material.name).toBe("star");
+    expect(star.material.uniforms.uBaseColor.value).toEqual(new Color("#fff2cc"));
     for (const planet of [bodies[0], bodies[2]]) {
+      expect(planet.material).toBeInstanceOf(ShaderMaterial);
+      expect(planet.material.name).toBe("planet");
       expect(star.geometry.parameters.radius).toBeGreaterThan(planet.geometry.parameters.radius);
     }
-    const light = scene.children.find((child) => child instanceof PointLight)!;
-    expect(light.position.toArray()).toEqual(star.position.toArray());
+    expect(scene.children.some((child) => child instanceof Light)).toBe(false);
   });
 
   it("moves planets along their XZ orbits while every body spins", () => {
@@ -75,15 +77,97 @@ describe("createSystem", () => {
   });
 
   it("provides one background point cloud and releases all GPU resources", () => {
-    const { scene, bodies, dispose } = makeSystem();
+    const { scene, dispose } = makeSystem();
     const points = scene.children.filter((child) => child instanceof Points);
     expect(points).toHaveLength(1);
     expect(points[0].geometry.getAttribute("position").count).toBe(3000);
-    const resources = [...bodies.flatMap((mesh) => [mesh.geometry, mesh.material]), points[0].geometry, points[0].material];
+    const resources: (BufferGeometry | Material)[] = [];
+    scene.traverse((object) => {
+      if (object instanceof Mesh || object instanceof Points || object instanceof LineSegments) {
+        resources.push(object.geometry, ...(Array.isArray(object.material) ? object.material : [object.material]));
+      }
+    });
+    // Three surfaces, three glow children, nebula, stars and streaks each own a geometry and material.
+    expect(resources).toHaveLength(18);
     const spies = resources.map((resource) => vi.spyOn(resource, "dispose"));
     dispose();
     spies.forEach((spy) => expect(spy).toHaveBeenCalledOnce());
     expect(scene.children).toHaveLength(0);
+    dispose();
+    spies.forEach((spy) => expect(spy).toHaveBeenCalledOnce());
+  });
+
+  it("adds atmosphere shells and a camera-facing corona as children outside the body pick list", () => {
+    const { bodies } = makeSystem();
+    bodies.forEach((body, index) => {
+      expect(body.children).toHaveLength(1);
+      const glow = body.children[0] as Mesh<SphereGeometry | PlaneGeometry, ShaderMaterial>;
+      expect(glow.parent).toBe(body);
+      expect(bodies).not.toContain(glow);
+      expect(glow.material.uniforms.uAtmosphereColor.value).toEqual(new Color(universe.bodies[index].visual.atmosphereColor));
+      expect(glow.material.uniforms.uGlowIntensity.value).toBe(universe.bodies[index].visual.glowIntensity);
+      if (universe.bodies[index].orbit === null) {
+        expect(glow.material.name).toBe("corona");
+        expect(glow.geometry).toBeInstanceOf(PlaneGeometry);
+      } else {
+        expect(glow.material.name).toBe("atmosphere");
+        expect(glow.geometry).toBeInstanceOf(SphereGeometry);
+        expect((glow.geometry as SphereGeometry).parameters.radius).toBeCloseTo(body.geometry.parameters.radius * 1.08);
+      }
+    });
+  });
+
+  it("places the dim nebula outside the entire star field and draws it first", () => {
+    const { scene, radius } = makeSystem();
+    const nebula = scene.children.find((child) => child instanceof Mesh && child.material.name === "nebula") as Mesh<SphereGeometry, ShaderMaterial>;
+    const stars = scene.children.find((child) => child instanceof Points) as Points;
+    const positions = stars.geometry.getAttribute("position");
+    expect(nebula.geometry.parameters.radius).toBe(radius * 14);
+    expect(nebula.renderOrder).toBeLessThan(stars.renderOrder);
+    for (let index = 0; index < positions.count; index++) {
+      expect(new Vector3().fromBufferAttribute(positions, index).length()).toBeLessThan(nebula.geometry.parameters.radius);
+    }
+  });
+
+  it("keeps surface and nebula time flowing while orbits are paused", () => {
+    const { scene, bodies, update } = makeSystem();
+    const initial = bodies.map((mesh) => mesh.position.clone());
+    update(2, false);
+    update(3, true);
+    const materials: ShaderMaterial[] = [];
+    scene.traverse((object) => {
+      if (object instanceof Mesh && object.material instanceof ShaderMaterial && object.material.uniforms.uTime) {
+        materials.push(object.material);
+      }
+    });
+    expect(materials).toHaveLength(universe.bodies.length + 1);
+    materials.forEach((material) => expect(material.uniforms.uTime.value).toBe(5));
+    expect(bodies[0].position.equals(initial[0])).toBe(false);
+    const paused = bodies.map((mesh) => mesh.position.clone());
+    update(4, true);
+    bodies.forEach((body, index) => expect(body.position.equals(paused[index])).toBe(true));
+    materials.forEach((material) => expect(material.uniforms.uTime.value).toBe(9));
+  });
+
+  it("derives appearance from visual and orbit type regardless of ID, name or lock", () => {
+    const original = makeSystem();
+    const renamed = createSystem({ bodies: universe.bodies.map((body, index) => ({
+      ...body, id: `changed-${index}`, name: "RENAMED", subtitle: "CHANGED", locked: !body.locked,
+    })) });
+    systems.push(renamed);
+    original.bodies.forEach((body, index) => {
+      const other = renamed.bodies[index];
+      expect(other.geometry.parameters).toEqual(body.geometry.parameters);
+      for (const [first, second] of [[body.material, other.material], [
+        (body.children[0] as Mesh<BufferGeometry, ShaderMaterial>).material,
+        (other.children[0] as Mesh<BufferGeometry, ShaderMaterial>).material,
+      ]]) {
+        expect(second.name).toBe(first.name);
+        expect(second.uniforms).toEqual(first.uniforms);
+        expect(second.vertexShader).toBe(first.vertexShader);
+        expect(second.fragmentShader).toBe(first.fragmentShader);
+      }
+    });
   });
 
   it("pauses all orbits without stopping spin or jumping ahead on resume", () => {

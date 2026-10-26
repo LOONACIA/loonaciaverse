@@ -1,5 +1,6 @@
-import { AdditiveBlending, AmbientLight, BufferGeometry, Color, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshStandardMaterial, PointLight, Points, PointsMaterial, Scene, SphereGeometry } from "three";
-import type { Vector3 } from "three";
+import { AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, PlaneGeometry, Points, PointsMaterial, Scene, SphereGeometry } from "three";
+import type { ShaderMaterial, Vector3 } from "three";
+import { createAtmosphereMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial, createStarMaterial } from "./materials";
 import { OrbitClock, orbitPosition } from "./orbit";
 import type { UniverseDto } from "./types";
 
@@ -12,12 +13,15 @@ export function createSystem(universe: UniverseDto) {
   const scene = new Scene();
   scene.background = new Color("#05070d");
   const clock = new OrbitClock();
+  const animatedMaterials: ShaderMaterial[] = [];
+  let elapsedSeconds = 0;
   const bodies = universe.bodies.map((body) => {
     const isStar = body.orbit === null;
     const geometry = new SphereGeometry(isStar ? STAR_RADIUS : PLANET_RADIUS, 48, 32);
     const material = isStar
-      ? new MeshBasicMaterial({ color: body.visual.baseColor })
-      : new MeshStandardMaterial({ color: body.visual.baseColor, roughness: 0.85 });
+      ? createStarMaterial(body.visual)
+      : createPlanetMaterial(body.visual);
+    animatedMaterials.push(material);
     const mesh = new Mesh(geometry, material);
     mesh.userData.bodyId = body.id;
     const position = orbitPosition(body.orbit, 0);
@@ -25,17 +29,21 @@ export function createSystem(universe: UniverseDto) {
     scene.add(mesh);
 
     if (isStar) {
-      const light = new PointLight(body.visual.baseColor, 600);
-      light.position.copy(mesh.position);
-      scene.add(light);
+      mesh.add(new Mesh(new PlaneGeometry(STAR_RADIUS * 6, STAR_RADIUS * 6), createCoronaMaterial(body.visual)));
+    } else {
+      mesh.add(new Mesh(new SphereGeometry(PLANET_RADIUS * 1.08, 48, 32), createAtmosphereMaterial(body.visual)));
     }
 
     return mesh;
   });
-  scene.add(new AmbientLight("#9aacc8", 0.15));
 
   // Include each body's size when framing the entire orbit, even at its nearest edge.
   const radius = Math.max(STAR_RADIUS, ...universe.bodies.map((body) => body.orbit === null ? STAR_RADIUS : body.orbit.radius + PLANET_RADIUS));
+  const nebulaMaterial = createNebulaMaterial();
+  const nebula = new Mesh(new SphereGeometry(radius * 14, 48, 32), nebulaMaterial);
+  nebula.renderOrder = -1;
+  scene.add(nebula);
+  animatedMaterials.push(nebulaMaterial);
   const positions = new Float32Array(STAR_COUNT * 3);
   for (let index = 0; index < STAR_COUNT; index++) {
     const azimuth = Math.random() * Math.PI * 2;
@@ -79,6 +87,8 @@ export function createSystem(universe: UniverseDto) {
     },
     update(deltaSeconds: number, orbitsPaused = false): void {
       clock.advance(deltaSeconds, orbitsPaused);
+      elapsedSeconds += deltaSeconds;
+      animatedMaterials.forEach((material) => { material.uniforms.uTime.value = elapsedSeconds; });
       bodies.forEach((mesh, index) => {
         const position = orbitPosition(universe.bodies[index].orbit, clock.seconds);
         mesh.position.set(position.x, 0, position.z);
@@ -86,14 +96,14 @@ export function createSystem(universe: UniverseDto) {
       });
     },
     dispose(): void {
-      bodies.forEach((mesh) => {
-        mesh.geometry.dispose();
-        mesh.material.dispose();
+      // Traverse children too: atmosphere shells and the corona own GPU resources.
+      scene.traverse((object) => {
+        if (object instanceof Mesh || object instanceof Points || object instanceof LineSegments) {
+          object.geometry.dispose();
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          materials.forEach((material) => material.dispose());
+        }
       });
-      starGeometry.dispose();
-      starMaterial.dispose();
-      streakGeometry.dispose();
-      streakMaterial.dispose();
       scene.clear();
     },
   };
