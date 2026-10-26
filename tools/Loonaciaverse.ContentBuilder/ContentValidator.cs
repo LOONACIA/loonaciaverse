@@ -55,9 +55,14 @@ public sealed class ContentValidator
 
     public void ValidateCover(string sourcePath, string sourceDir, string? cover)
     {
-        if (ContentAssets.IsRelativeUrl(cover) && !ContentAssets.FileExists(sourceDir, cover!))
+        ValidateAsset(sourcePath, sourceDir, "cover", cover);
+    }
+
+    public void ValidateAsset(string sourcePath, string sourceDir, string field, string? url)
+    {
+        if (ContentAssets.IsRelativeUrl(url) && !ContentAssets.FileExists(sourceDir, url!))
         {
-            errors.Add($"{sourcePath}: cover '{cover}' must reference an existing file in the content folder.");
+            errors.Add($"{sourcePath}: {field} '{url}' must reference an existing file in the content folder.");
         }
     }
 

@@ -3,6 +3,29 @@ namespace Loonaciaverse.ContentBuilder.Tests;
 public class ContentBuildRunnerTests
 {
     [Fact]
+    public void RunCollectsPostProjectAndAboutErrorsAndClearsPreviousOutput()
+    {
+        using var directory = new TemporaryDirectory();
+        var contentDir = Path.Combine(directory.Root, "source");
+        var options = new BuildOptions(contentDir, Path.Combine(directory.Root, "wwwroot"), false);
+        ContentTestData.WriteAbout(contentDir);
+        Assert.True(ContentBuildRunner.Run(options).Success);
+        var postDir = Directory.CreateDirectory(Path.Combine(contentDir, "posts", "invalid")).FullName;
+        File.WriteAllText(Path.Combine(postDir, "index.md"), "---\ndraft: true\n---\nBody");
+        ContentTestData.WriteProject(contentDir, "invalid", "draft: true");
+        ContentTestData.WriteAbout(contentDir, "stack: [csharp]");
+
+        var result = ContentBuildRunner.Run(options);
+
+        Assert.False(result.Success);
+        Assert.Equal(12, result.Errors.Count);
+        Assert.Equal(4, result.Errors.Count(error => error.StartsWith("posts/invalid/index.md: ")));
+        Assert.Equal(5, result.Errors.Count(error => error.StartsWith("projects/invalid/index.md: ")));
+        Assert.Equal(3, result.Errors.Count(error => error.StartsWith("about.md: ")));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(options.OutputDir, "content")));
+    }
+
+    [Fact]
     public void RunFailsForMissingContentWithoutDeletingOutput()
     {
         using var directory = new TemporaryDirectory();
@@ -37,12 +60,15 @@ public class ContentBuildRunnerTests
         var styleFile = Path.Combine(outputDir, "css", "site.css");
         File.WriteAllText(styleFile, "keep css");
 
+        ContentTestData.WriteAbout(contentDir);
+
         var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, true));
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
         Assert.True(Directory.Exists(contentOutputDir));
-        Assert.Equal(Path.Combine(contentOutputDir, "posts.json"), Assert.Single(Directory.EnumerateFileSystemEntries(contentOutputDir)));
+        Assert.Equal(new[] { "about.json", "posts.json", "projects.json" }, Directory.EnumerateFileSystemEntries(contentOutputDir).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal("[]", File.ReadAllText(Path.Combine(contentOutputDir, "projects.json")));
         Assert.Equal("[]", File.ReadAllText(Path.Combine(contentOutputDir, "posts.json")));
         Assert.Equal("keep html", File.ReadAllText(otherFile));
         Assert.Equal("keep css", File.ReadAllText(styleFile));
@@ -55,6 +81,8 @@ public class ContentBuildRunnerTests
         using var directory = new TemporaryDirectory();
         var contentDir = Directory.CreateDirectory(Path.Combine(directory.Root, "source")).FullName;
         var outputDir = Path.Combine(directory.Root, "wwwroot");
+
+        ContentTestData.WriteAbout(contentDir);
 
         var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, false));
 

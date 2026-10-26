@@ -15,39 +15,17 @@ public static class PostBuilder
     public static BuildResult Build(string contentDir, string contentOutputDir, bool includeDrafts)
     {
         var postsDir = Path.Combine(contentDir, "posts");
-        var documents = new List<FrontMatterDocument<PostFrontMatter>>();
         var errors = new List<string>();
         var validator = new ContentValidator();
-
-        if (Directory.Exists(postsDir))
+        var documents = ContentDocuments.ReadCollection<PostFrontMatter>(contentDir, "posts", (path, folder, data) =>
         {
-            foreach (var postDir in Directory.EnumerateDirectories(postsDir).Order(StringComparer.Ordinal))
-            {
-                var sourcePath = Path.Combine(postDir, "index.md");
-                if (!File.Exists(sourcePath))
-                {
-                    continue;
-                }
-
-                var relativePath = Path.GetRelativePath(contentDir, sourcePath).Replace('\\', '/');
-                try
-                {
-                    var document = FrontMatterReader.Read<PostFrontMatter>(File.ReadAllText(sourcePath), relativePath);
-                    var data = document.Data;
-                    validator.ValidateRequired(relativePath, "title", data.Title);
-                    validator.ValidateSlug(relativePath, Path.GetFileName(postDir), data.Slug);
-                    validator.ValidateDates(relativePath, data.Date, data.Updated);
-                    validator.ValidateRequired(relativePath, "summary", data.Summary);
-                    validator.ValidateTags(relativePath, data.Tags);
-                    validator.ValidateCover(relativePath, postDir, data.Cover);
-                    documents.Add(document);
-                }
-                catch (ContentValidationException exception)
-                {
-                    errors.Add(exception.Message);
-                }
-            }
-        }
+            validator.ValidateRequired(path, "title", data.Title);
+            validator.ValidateSlug(path, Path.GetFileName(folder), data.Slug);
+            validator.ValidateDates(path, data.Date, data.Updated);
+            validator.ValidateRequired(path, "summary", data.Summary);
+            validator.ValidateTags(path, data.Tags);
+            validator.ValidateCover(path, folder, data.Cover);
+        }, errors);
 
         errors.AddRange(validator.Errors);
         if (errors.Count > 0)
