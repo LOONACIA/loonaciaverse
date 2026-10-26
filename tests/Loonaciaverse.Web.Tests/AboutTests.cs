@@ -10,6 +10,21 @@ namespace Loonaciaverse.Web.Tests;
 public class AboutTests
 {
     [Fact]
+    public void ContentLoadFailureShowsSignalLost()
+    {
+        using var context = new BunitContext();
+        var service = new FakeContentService { GetAboutAsyncHandler = _ => Task.FromException<AboutProfile>(new HttpRequestException("Offline")) };
+        context.Services.AddSingleton<IContentService>(service);
+
+        var component = context.Render<About>();
+
+        Assert.Equal("SIGNAL LOST", component.Find("[role='alert'] .hud-label").TextContent);
+        Assert.Equal("RETRY", component.Find("button[type='button']").TextContent);
+        Assert.Empty(component.FindAll("article"));
+        Assert.Single(service.AboutCalls);
+    }
+
+    [Fact]
     public void RendersProfileContentAndCommsInOrder()
     {
         using var context = new BunitContext();

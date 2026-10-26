@@ -1,0 +1,32 @@
+.signal-lost {
+    max-width: 72ch;
+    margin-inline: auto;
+    padding-block: clamp(3rem, 12vh, 8rem);
+    text-align: center;
+}
+
+h2 {
+    margin: 0;
+    color: var(--color-danger);
+}
+
+p {
+    margin-block: 1.5rem 2.5rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+}
+
+button {
+    padding: 0.75rem 1.5rem;
+    background: var(--color-surface);
+    color: var(--color-hud);
+    font-family: var(--font-hud);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+}
+
+button:hover {
+    border-color: var(--color-hud);
+    color: var(--color-text);
+}

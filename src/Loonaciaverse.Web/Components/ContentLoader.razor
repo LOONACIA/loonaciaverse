@@ -9,6 +9,18 @@ else if (item is not null)
 {
     @ChildContent(item)
 }
+else if (failed)
+{
+    <SignalLost OnRetry="LoadAsync" />
+}
+else if (NotFound is not null)
+{
+    @NotFound
+}
+else
+{
+    <LostInSpace />
+}
 
 @code {
     [Parameter, EditorRequired]
@@ -17,18 +29,55 @@ else if (item is not null)
     [Parameter, EditorRequired]
     public RenderFragment<TItem> ChildContent { get; set; } = default!;
 
+    [Parameter]
+    public RenderFragment? NotFound { get; set; }
+
     private readonly CancellationTokenSource cancellation = new();
     private bool loading = true;
+    private bool failed;
+    private bool disposed;
     private TItem? item;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
     {
-        item = await Load(cancellation.Token);
-        loading = false;
+        if (disposed)
+        {
+            return;
+        }
+
+        loading = true;
+        failed = false;
+        item = null;
+
+        try
+        {
+            var result = await Load(cancellation.Token);
+            if (!disposed)
+            {
+                item = result;
+                loading = false;
+            }
+        }
+        catch (Exception)
+        {
+            if (!disposed)
+            {
+                failed = true;
+                loading = false;
+            }
+        }
     }
 
     public void Dispose()
     {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
         cancellation.Cancel();
         cancellation.Dispose();
     }
