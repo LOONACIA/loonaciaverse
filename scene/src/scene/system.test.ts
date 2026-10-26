@@ -85,4 +85,17 @@ describe("createSystem", () => {
     spies.forEach((spy) => expect(spy).toHaveBeenCalledOnce());
     expect(scene.children).toHaveLength(0);
   });
+
+  it("pauses all orbits without stopping spin or jumping ahead on resume", () => {
+    const { bodies, update } = makeSystem();
+    const initial = bodies.map((mesh) => mesh.position.clone());
+    update(100, true);
+    bodies.forEach((mesh, index) => {
+      expect(mesh.position.equals(initial[index])).toBe(true);
+      expect(mesh.rotation.y).toBeGreaterThan(0);
+    });
+    update(20, false);
+    expect(bodies[0].position.x).toBeCloseTo(8 * Math.cos(0.5 + Math.PI / 2));
+    expect(bodies[0].position.z).toBeCloseTo(8 * Math.sin(0.5 + Math.PI / 2));
+  });
 });

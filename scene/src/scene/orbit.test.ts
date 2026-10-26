@@ -1,5 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { OrbitClock, orbitPosition } from "./orbit";
+import { OrbitClock, orbitPosition, shouldPauseOrbits } from "./orbit";
+
+describe("shouldPauseOrbits", () => {
+  it.each([
+    [false, false, false, false],
+    [false, false, true, true],
+    [false, true, false, true],
+    [false, true, true, true],
+    [true, false, false, true],
+    [true, false, true, true],
+    [true, true, false, true],
+    [true, true, true, true],
+  ])("focus %s, hover %s, highlight %s pauses: %s", (focused, hovered, highlighted, paused) => {
+    expect(shouldPauseOrbits(focused, hovered, highlighted)).toBe(paused);
+  });
+});
 
 describe("orbitPosition", () => {
   const orbit = { radius: 8, periodSeconds: 80, phase: 0 };

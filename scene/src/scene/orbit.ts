@@ -1,5 +1,9 @@
 import type { BodyDto } from "./types";
 
+export function shouldPauseOrbits(focused: boolean, hovered: boolean, highlighted: boolean): boolean {
+  return focused || hovered || highlighted;
+}
+
 export function orbitPosition(orbit: BodyDto["orbit"], orbitSeconds: number): { x: number; z: number } {
   if (orbit === null) {
     return { x: 0, z: 0 };

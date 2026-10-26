@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import { dispose, init } from "../src/scene/scene";
+import { clearFocus, dispose, focus, highlight, init } from "../src/scene/scene";
 import type { UniverseDto } from "../src/scene/types";
 
 // Scene fields from content/universe.yml; this fixture is only used by the sandbox.
@@ -30,9 +30,36 @@ const universe: UniverseDto = {
 };
 
 const container = document.getElementById("scene")!;
+const immediate = document.getElementById("immediate") as HTMLInputElement;
+const highlightToggles: HTMLInputElement[] = [];
+for (const body of universe.bodies) {
+  const row = document.createElement("div");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = `FOCUS ${body.name}`;
+  button.addEventListener("click", () => focus(body.id, immediate.checked));
+  const label = document.createElement("label");
+  const toggle = document.createElement("input");
+  toggle.type = "checkbox";
+  toggle.setAttribute("aria-label", `HIGHLIGHT ${body.name}`);
+  toggle.addEventListener("change", () => {
+    highlightToggles.forEach((other) => { if (other !== toggle) other.checked = false; });
+    highlight(toggle.checked ? body.id : null);
+  });
+  highlightToggles.push(toggle);
+  label.append(toggle, "HIGHLIGHT");
+  row.append(button, label);
+  document.getElementById("body-controls")!.append(row);
+}
+document.getElementById("clear")!.addEventListener("click", clearFocus);
 const initialized = init(container, universe, {
   async invokeMethodAsync(methodName, ...args) {
     console.log(methodName, ...args);
+    if (methodName === "OnBodyClicked") {
+      const id = args[0] as string | null;
+      if (id === null) clearFocus();
+      else focus(id, immediate.checked);
+    }
   },
 });
 if (!initialized) {

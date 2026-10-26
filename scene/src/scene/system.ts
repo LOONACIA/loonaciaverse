@@ -52,8 +52,8 @@ export function createSystem(universe: UniverseDto) {
     scene,
     bodies,
     radius,
-    update(deltaSeconds: number): void {
-      clock.advance(deltaSeconds, false);
+    update(deltaSeconds: number, orbitsPaused = false): void {
+      clock.advance(deltaSeconds, orbitsPaused);
       bodies.forEach((mesh, index) => {
         const position = orbitPosition(universe.bodies[index].orbit, clock.seconds);
         mesh.position.set(position.x, 0, position.z);
