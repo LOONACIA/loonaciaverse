@@ -1,0 +1,620 @@
+id: main-screen
+goal: >
+  Loonaciaverse의 메인 화면(`/`)을 만든다. 완료 상태는 다음과 같다.
+  부팅 화면(index.html)에 LOONACIAVERSE, NAVIGATION SYSTEM BOOT, 로드 게이지, 상세 페이지로 가는 일반 링크가 있다.
+  `/`는 Three.js 항성계를 보여 준다: 중심 항성과 공전하는 행성 3개, 절차적 셰이더, 별 필드와 성운, 이름표, 홀로그램 링, 블룸, 패럴랙스.
+  천체를 클릭하거나 키보드로 고르면 URL이 `/?focus={id}`로 바뀌고, 카메라가 줌인하며 Blazor HUD가 열린다.
+  뒤로가기, ✕, Esc, 빈 공간 클릭으로 HUD가 닫힌다.
+  TRAVEL은 1초 이내의 워프 연출 뒤 상세 페이지로 이동한다. 잠긴 Playground는 COMING SOON을 보여 주고 TRAVEL이 비활성이다.
+  WebGL2를 쓸 수 없거나 prefers-reduced-motion이면 같은 정보를 담은 목록형 홈을 보여 준다.
+  Blazor 동작은 bUnit, 씬의 순수 로직은 Vitest로 검증한다. 3D 렌더링 결과는 `npm run dev --prefix scene` sandbox에서 수동으로 확인한다.
+  배포(CI/CD, staticwebapp.config.json), 공통 OG 태그, 전송량 예산 검사는 이 계획의 범위가 아니다.
+approved: true
+max_attempts: 3
+ac_timeout_sec: 900
+steps:
+  - id: s1-boot-screen
+    title: add boot screen with load gauge and static links
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/UX.md ("3. 부팅 화면", "8. 디자인 토큰"), docs/PRD.md ("5. 대체 경로와 접근성"),
+      src/Loonaciaverse.Web/wwwroot/index.html, src/Loonaciaverse.Web/wwwroot/css/app.css, tests/Loonaciaverse.Web.Tests/StaticAssetTests.cs.
+
+      1. `wwwroot/index.html`에서 `<div id="app">Loading...</div>`의 내용을 부팅 화면 마크업으로 바꾼다.
+         Blazor가 `App`을 렌더링하면 `#app`의 내용이 통째로 교체되므로, 부팅 화면을 지우는 코드는 필요 없다.
+         - `LOONACIAVERSE`(`--font-display`)와 `NAVIGATION SYSTEM BOOT`(`.hud-label`)를 화면 중앙에 둔다.
+         - 진행 게이지: 채움 막대의 너비는 `var(--blazor-load-percentage, 0%)`, 퍼센트 텍스트는 `::after { content: var(--blazor-load-percentage-text, "0%"); }`로 채운다.
+           Blazor가 부팅하는 동안 이 두 CSS 변수를 갱신한다. 게이지에 JS를 쓰지 마라. 이유: .NET 런타임이 뜨기 전에 보이는 화면이다.
+         - 게이지 아래에 작은 일반 링크 `PROJECTS · BLOG · ABOUT`를 둔다: `<a href="/projects">PROJECTS</a>`, `/blog`, `/about`.
+           이유: JS를 실행하지 않는 크롤러와 기다리기 싫은 사용자가 상세 페이지로 바로 갈 수 있어야 한다(PRD 5).
+         - `<body>` 안, `#app` 밖에 `<noscript>`를 두고 "이 사이트는 JavaScript가 필요합니다." 같은 짧은 한국어 안내와 같은 세 링크를 넣는다.
+         - `<head>`의 stylesheet, importmap, `#blazor-error-ui`, blazor 스크립트는 바꾸지 마라.
+      2. `wwwroot/css/app.css`에 부팅 화면 스타일을 `.boot-` 접두사로 추가한다. 화면 중앙 정렬(`min-height: 100dvh`)이고, 색은 기존 토큰만 쓴다. 기존 규칙은 고치지 마라.
+      3. `StaticAssetTests.cs`에 테스트를 추가한다. 기존 테스트는 고치지 마라.
+         HTML은 AngleSharp의 `HtmlParser`로 파싱한다. AngleSharp는 bUnit의 의존성이라 테스트 프로젝트에서 바로 쓸 수 있다. 정규식으로 HTML 구조를 검사하지 마라.
+         - `#app` 안에 `/projects`, `/blog`, `/about` 링크가 이 순서로 있고, 텍스트가 각각 `PROJECTS`, `BLOG`, `ABOUT`이다.
+         - `#app` 안에 `NAVIGATION SYSTEM BOOT` 텍스트가 있다.
+         - `noscript` 안에 같은 세 링크가 있다.
+         - `app.css`가 `--blazor-load-percentage`와 `--blazor-load-percentage-text`를 쓴다.
+
+      Razor 컴포넌트와 페이지를 고치지 마라. `<link rel="modulepreload">`를 추가하지 마라. 이유: `js/scene.js`는 s3에서 생기고, preload는 s4에서 단다.
+      공통 OG 태그를 추가하지 마라. 이유: 이 계획의 범위가 아니다.
+    expected_files:
+      - src/Loonaciaverse.Web/wwwroot/index.html
+      - src/Loonaciaverse.Web/wwwroot/css/app.css
+      - tests/Loonaciaverse.Web.Tests/StaticAssetTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+
+  - id: s2-list-home
+    title: show list home with body HUD info
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.1 천체", "4.7 HUD 내용", "5. 목록형 홈", "6. 상세 페이지 공통"의 폰트 규칙, "8. 디자인 토큰", "10. HUD 카피"),
+      docs/ARCHITECTURE.md ("레이어 규칙", "콘텐츠 모델"), src/Loonaciaverse.Core/Content/Universe.cs, Posts.cs, Projects.cs,
+      src/Loonaciaverse.Web/Pages/Home.razor, Components/ContentLoader.razor, Components/ProjectCard.razor, Components/PostListItem.razor,
+      Components/Formatting.cs, Pages/About.razor(COMMS 링크), wwwroot/css/app.css(`.hud-label`, `.hud-frame`, `.chip`, `.badge`),
+      tests/Loonaciaverse.Web.Tests/HomeTests.cs, TestContent.cs, FakeContentService.cs.
+
+      이 스텝이 끝나면 `/`는 항상 목록형 홈을 보여 준다. 3D 씬은 s3~s4에서 붙이고, 그때부터 목록형 홈은 WebGL을 쓸 수 없거나 reduced-motion일 때의 대체 화면이 된다.
+
+      1. `Components/BodyInfo.razor`(+ `BodyInfo.razor.css`): 천체 하나의 HUD 정보. 목록형 홈 카드와 s6의 3D HUD 패널이 함께 쓴다.
+         - 파라미터: `[Parameter, EditorRequired] public CelestialBody Body`, `[Parameter, EditorRequired] public HudStats Stats`.
+         - 맨 위에 세계관 이름(`<h2>`, `--font-display`), 부제(`.hud-label`), tagline(`--font-body`)을 둔다.
+         - `Body.Locked`이면 id와 상관없이 `STATUS` / `SIGNAL UNCONFIRMED`와 `COMING SOON`만 보여 준다. 잠기지 않았으면 id에 따라 다음을 보여 준다.
+           - `about`: `CLASS` = `Stats.About.Title`, `PRIMARY STACK` = `Stats.About.Stack` 칩, `COMMS` = 이메일(`mailto:`), GitHub, LinkedIn 아이콘 링크.
+             GitHub나 LinkedIn 값이 null이면 그 링크를 생략한다. 아이콘은 인라인 SVG(`aria-hidden="true"`)이고, 링크에 `aria-label`(`EMAIL`, `GITHUB`, `LINKEDIN`)을 단다.
+             외부 아이콘 라이브러리나 CDN을 쓰지 마라. 외부 링크는 About.razor처럼 `target="_blank" rel="noopener noreferrer"`를 단다.
+           - `projects`: `PROJECTS` = `ProjectCount`, `PRIMARY STACK` = `TopStack` 칩, `FEATURED` = `Featured`가 있으면 썸네일(있을 때)과 제목을 담은 카드 링크 `/projects/{slug}`.
+           - `blog`: `POSTS` = `PostCount`, `LAST TRANSMISSION` = `LastPublished`(`Formatting.FormatDate`, null이면 `—`),
+             `TOP TAGS` = `TopTags`를 ` · `로 이은 텍스트, `LATEST` = `Latest`가 있으면 제목과 요약을 담은 카드 링크 `/blog/{slug}`.
+           - 그 밖의 id는 헤더만 보여 준다.
+         - FEATURED, LATEST 카드의 대상이 `Draft`이면 목록 페이지처럼 `DRAFT` 배지(`badge badge-draft`)를 붙인다.
+         - 라벨과 값은 `<dl>`(`<dt class="hud-label">`, `<dd>`)로 쓴다. 숫자와 날짜는 `--font-hud`, 한글이 들어갈 수 있는 값(제목, 요약, 칩, tagline)은 `--font-body`로 쓴다.
+           이유: Michroma와 Rajdhani에는 한글 글리프가 없다(UX.md 6절).
+      2. `Components/ListHome.razor`(+ `ListHome.razor.css`): 파라미터는 `[Parameter, EditorRequired] public Universe Universe`.
+         - `Universe.Bodies` 순서대로 카드(`<article class="hud-frame">`)를 세로로 쌓는다. 카드마다 `BodyInfo`와 하단의 `TRAVEL` 링크(`<a href="{Route}">`)를 둔다.
+         - 천체가 잠겼거나 `Route`가 null이면 TRAVEL은 링크가 아니라 `aria-disabled="true"`인 비활성 요소이고, 색은 `--color-locked`다.
+         - 카드 전체를 `<a>`로 감싸지 마라. 이유: 카드 안에 FEATURED, LATEST, COMMS 링크가 있어 링크가 중첩된다.
+      3. `Pages/Home.razor`: 기존 `ContentLoader`와 `PageMeta`를 유지한다. `<h1>`(사이트 제목) 아래에 `SELECT DESTINATION`(`.hud-label`)과 `<ListHome Universe="universe" />`를 둔다.
+         필요하면 `Pages/Home.razor.css`로 가운데 정렬과 여백을 준다.
+         `@layout PageLayout`을 붙이지 마라. 이유: 홈은 s4부터 전체 화면 3D가 되고, 상단 바는 상세 페이지 전용이다(UX.md 6절).
+      4. 테스트(bUnit). `TestContent.Universe()`를 쓰고, 필요한 stats는 `with`로 채운다. `TestContent`의 기존 값은 바꾸지 마라. 이유: 다른 테스트가 그 값에 의존한다.
+         - `BodyInfoTests.cs`: 위 1의 모든 분기를 검증한다. 천체별 라벨, 값, 링크 href. 잠긴 천체는 COMING SOON과 SIGNAL UNCONFIRMED만 있고 stats 항목이 없다.
+           `LastPublished`가 null이면 `—`이다. `Featured`나 `Latest`가 null이면 카드가 없다. GitHub나 LinkedIn이 null이면 그 링크가 없다. Draft 카드에 DRAFT 배지가 있다.
+         - `ListHomeTests.cs`: 카드 수와 순서, 잠기지 않은 카드의 TRAVEL href, 잠긴 카드의 TRAVEL이 `<a>`가 아니고 `aria-disabled="true"`인지 검증한다.
+         - `HomeTests.cs`: 기존 테스트를 유지하고, 목록형 홈 카드 4개가 렌더링되는지 추가한다.
+    expected_files:
+      - src/Loonaciaverse.Web/Components/BodyInfo.razor
+      - src/Loonaciaverse.Web/Components/BodyInfo.razor.css
+      - src/Loonaciaverse.Web/Components/ListHome.razor
+      - src/Loonaciaverse.Web/Components/ListHome.razor.css
+      - src/Loonaciaverse.Web/Pages/Home.razor
+      - src/Loonaciaverse.Web/Pages/Home.razor.css
+      - tests/Loonaciaverse.Web.Tests/BodyInfoTests.cs
+      - tests/Loonaciaverse.Web.Tests/ListHomeTests.cs
+      - tests/Loonaciaverse.Web.Tests/HomeTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+
+  - id: s3-scene-render
+    title: render star system scene with orbiting bodies
+    type: feat
+    scope: scene
+    description: |
+      먼저 읽을 파일: docs/ARCHITECTURE.md ("디렉토리 구조"의 scene/, "레이어 규칙", "씬 모듈 계약", "데이터 흐름"의 빌드, "테스트"),
+      docs/ADR.md (ADR-003, ADR-005, ADR-007), docs/UX.md ("4.1 천체", "4.2 카메라와 움직임", "9. 렌더 품질 단계"),
+      scene/package.json, scene/vite.config.ts, scene/tsconfig.json, scene/src/toc.ts, scene/src/toc.test.ts,
+      src/Loonaciaverse.Web/Loonaciaverse.Web.csproj (`PrepareSceneBuild`, `BuildSceneBundle` 타깃), content/universe.yml, src/Loonaciaverse.Core/Content/Universe.cs.
+
+      이 스텝은 `scene/`의 Three.js 씬이 항성계를 그리고 공전시키는 데까지다. Blazor 연결(SceneInterop)은 s4에서 한다.
+
+      1. 의존성: `three`(dependencies)와 `@types/three`(devDependencies)를 최신 안정 버전으로 추가하고 `package-lock.json`을 갱신한다.
+         다른 3D 라이브러리나 Blazor용 Three.js 래퍼를 추가하지 마라. 이유: ADR-003.
+      2. `scene/src/scene/types.ts`: C#의 `Universe`가 Blazor JS interop(camelCase JSON)으로 넘어온 모양 중 씬이 쓰는 부분만 타입으로 정의한다.
+         - `UniverseDto { bodies: BodyDto[] }`
+         - `BodyDto { id: string; name: string; subtitle: string; locked: boolean; visual: { baseColor: string; atmosphereColor: string; noiseScale: number; glowIntensity: number }; orbit: { radius: number; periodSeconds: number; phase: number } | null }`
+         - `DotNetCallbacks { invokeMethodAsync(methodName: string, ...args: unknown[]): Promise<unknown> }`: Blazor `DotNetObjectReference`의 JS 쪽 모양이다.
+      3. `scene/src/scene/orbit.ts`: Three.js를 import하지 않는 순수 모듈.
+         - `orbitPosition(orbit, orbitSeconds): { x: number; z: number }`: 궤도면은 XZ 평면이고, 각도 = `phase + 2π · orbitSeconds / periodSeconds`다. orbit이 null(항성)이면 원점이다.
+         - 공전 시간 시계(예: `OrbitClock`): `advance(deltaSeconds, paused)`는 paused가 아닐 때만 공전 시간을 누적한다.
+           이유: s5에서 호버나 포커스 중에 공전을 멈췄다가 다시 움직일 때 위치가 튀면 안 된다. 이 스텝에서는 paused를 항상 false로 넘긴다.
+         - 자전은 공전과 별개로 항상 진행한다(UX.md 4.2).
+      4. `scene/src/scene/system.ts`: Three.js 객체 구성. 렌더러 없이 만들 수 있어야 한다(테스트가 직접 만든다).
+         - `createSystem(universe: UniverseDto)`: 천체마다 구(`SphereGeometry`) 메시 하나를 만들고, 천체 id를 `userData.bodyId`에 둔다.
+           orbit이 null인 천체가 중심 항성이다. id로 항성을 판별하지 마라. 이유: 천체 정의는 universe.yml 데이터다. 항성은 행성보다 크게 둔다.
+         - 지금은 `visual.baseColor`를 쓰는 단순한 재질을 쓴다: 항성은 `MeshBasicMaterial`, 행성은 빛을 받는 재질과 항성 위치의 `PointLight`. 절차적 셰이더는 s10에서 바꾼다.
+         - 배경 별 필드: `Points` 하나. 개수는 고정 상수(예: 3000)다. 품질 단계별 개수는 s12에서 다룬다.
+         - `update(deltaSeconds)`: 공전 시계를 진행하고 행성 위치(`orbitPosition`)와 자전을 갱신한다.
+         - 텍스처 이미지, glTF, HDR 환경맵을 쓰지 마라. 이유: ADR-007.
+      5. `scene/src/scene/scene.ts`: 씬 모듈 진입점. ARCHITECTURE "씬 모듈 계약"의 `init`과 `dispose`만 구현하고, 계약을 다음처럼 바꾼다(문서는 s13에서 고친다).
+         - `export function init(container: HTMLElement, universe: UniverseDto, callbacks: DotNetCallbacks): boolean`
+           - 캔버스는 Blazor가 아니라 씬이 `container` 안에 직접 만든다. 이유: s11의 이름표 레이어(CSS2DRenderer)도 같은 컨테이너에 넣어야 하는데,
+             Blazor가 그린 요소 옆에 JS가 형제 노드를 끼우면 Blazor의 DOM diff와 충돌한다.
+           - `matchMedia("(prefers-reduced-motion: reduce)")`가 맞거나 WebGL2 컨텍스트를 만들 수 없으면, 아무것도 만들지 않고 `false`를 반환한다.
+             WebGL2 확인은 `WebGLRenderer`를 만들기 전에 임시 캔버스의 `getContext("webgl2")`로 한다. 렌더러 생성이 throw해도 `false`를 반환한다.
+           - 이미 초기화돼 있으면 먼저 `dispose()`한다. 모듈 수준 상태에는 씬이 하나만 있다.
+           - 카메라: 궤도면을 비스듬히 내려다보는 고정 시점의 `PerspectiveCamera`. 가장 바깥 궤도(universe의 최대 반지름)가 화면에 다 들어오게 거리를 정한다.
+             사용자 회전이나 줌(OrbitControls 등)을 넣지 마라. 이유: UX.md 4.2.
+           - 픽셀 비율은 `Math.min(devicePixelRatio, 2)`다. 모바일 품질 단계는 s12에서 다룬다.
+           - `ResizeObserver`로 컨테이너 크기를 따라 렌더러 크기와 카메라 aspect를 갱신한다.
+           - `requestAnimationFrame` 루프에서 `update(delta)` 뒤 렌더한다. `visibilitychange`로 문서가 숨겨지면 루프를 멈추고, 다시 보이면 재개한다. 재개 첫 프레임의 delta가 튀지 않게 한다.
+           - `callbacks`는 저장만 한다. 클릭 알림은 s5에서 만든다.
+         - `export function dispose(): void`: 루프 정지, 리스너와 ResizeObserver 해제, 지오메트리와 재질 dispose, `renderer.dispose()`와 `renderer.forceContextLoss()`, 캔버스 제거.
+           초기화되지 않았을 때 불러도 안전해야 한다. 이유: 홈을 다시 방문할 때마다 새 WebGL 컨텍스트를 만들므로 이전 컨텍스트를 확실히 놓아야 한다.
+         - `focus`, `clearFocus`, `warp`는 아직 만들지 마라. 빈 함수도 두지 마라. 이유: s5와 s8에서 동작과 테스트를 함께 추가한다.
+      6. 빌드:
+         - `vite.config.ts`의 lib entry에 `scene: "src/scene/scene.ts"`를 추가해 `wwwroot/js/scene.js`가 나오게 한다. 기존 highlight, toc entry와 다른 설정은 그대로 둔다.
+         - `Loonaciaverse.Web.csproj`의 `PrepareSceneBuild`에서 stamp를 지우는 조건에 `wwwroot/js/scene.js`가 없을 때를 추가한다. 다른 타깃은 고치지 마라.
+      7. sandbox(Blazor 없이 씬만 띄우는 개발 페이지):
+         - `scene/sandbox/index.html`과 `scene/sandbox/main.ts`: 전체 화면 컨테이너에 `init`을 호출한다.
+           고정 universe 데이터는 `content/universe.yml`의 bodies 값을 옮겨 `sandbox/main.ts`에 둔다. callbacks는 받은 호출을 `console.log`하는 가짜 객체다.
+         - `package.json` scripts에 `"dev": "vite sandbox"`를 추가한다. `tsconfig.json`의 `include`에 `sandbox`를 추가해 `npm run build`의 `tsc --noEmit`이 sandbox도 검사하게 한다.
+         - sandbox를 빌드 entry에 넣지 마라. 이유: 개발용 페이지라 wwwroot에 나가면 안 된다.
+      8. 테스트(Vitest, happy-dom):
+         - `orbit.test.ts`: 위상 0일 때와 주기의 1/4 지점의 위치, 항성(null orbit)은 원점, paused일 때 공전 시간이 누적되지 않음.
+         - `system.test.ts`: 천체 수만큼 메시가 있고 id가 붙어 있다. 항성은 원점에 있다. `update` 뒤 행성은 궤도 반지름만큼 떨어져 있다. 항성이 행성보다 크다.
+         - `scene.test.ts`: reduced-motion(`matchMedia` mock)이면 `false`를 반환하고 컨테이너에 아무것도 추가되지 않는다.
+           `getContext("webgl2")`가 null이면 `false`다. 초기화 전에 `dispose()`를 불러도 throw하지 않는다.
+    expected_files:
+      - scene/package.json
+      - scene/package-lock.json
+      - scene/tsconfig.json
+      - scene/vite.config.ts
+      - scene/src/scene/*
+      - scene/sandbox/*
+      - src/Loonaciaverse.Web/Loonaciaverse.Web.csproj
+    ac:
+      - npm test --prefix scene
+      - npm run build --prefix scene
+      - dotnet build
+      - dotnet test
+    timeout_sec: 2400
+
+  - id: s4-home-scene
+    title: show 3D star system on home with list fallback
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/ARCHITECTURE.md ("레이어 규칙", "데이터 흐름"의 런타임: 홈), docs/ADR.md (ADR-003),
+      docs/UX.md ("3. 부팅 화면"의 modulepreload, "4.3 상태"의 OVERVIEW, "5. 목록형 홈"),
+      scene/src/scene/scene.ts, scene/src/scene/types.ts, src/Loonaciaverse.Web/Pages/Home.razor, Components/ListHome.razor,
+      Components/ContentBody.razor (JS 모듈 import와 dispose 패턴), Program.cs, wwwroot/index.html,
+      tests/Loonaciaverse.Web.Tests/HomeTests.cs, ContentBodyTests.cs (bUnit `JSInterop.SetupModule` 사용법), StaticAssetTests.cs.
+
+      씬 모듈(`./js/scene.js`)의 현재 계약: `init(container: HTMLElement, universe, callbacks): boolean`은 WebGL2를 쓸 수 없거나 reduced-motion이면 false를 반환하고,
+      `dispose(): void`는 언제 불러도 안전하다. 씬은 `container` 안에 자기 캔버스를 만든다.
+
+      1. `Services/SceneInterop.cs`: C#에서 씬 모듈을 부르는 유일한 클래스다(ARCHITECTURE "레이어 규칙").
+         ```csharp
+         public sealed class SceneInterop(IJSRuntime js) : IAsyncDisposable
+         {
+             public Task<bool> InitAsync(ElementReference container, Universe universe);
+             public ValueTask DisposeAsync();
+         }
+         ```
+         - `InitAsync`는 `import("./js/scene.js")`를 한 번 하고, `init(container, universe, DotNetObjectReference.Create(this))`를 호출한다.
+           모듈 import나 `init`이 `JSException`을 던지면 `false`를 반환한다.
+         - `DisposeAsync`: 모듈이 로드됐으면 `dispose`를 호출하고, 모듈 참조와 `DotNetObjectReference`를 해제한다. `JSException`과 `JSDisconnectedException`은 삼킨다.
+           두 번 불러도 안전하다. `InitAsync`를 기다리는 중에 dispose되면 init 결과와 상관없이 씬을 정리한다.
+         - DI에 등록하지 마라. 컴포넌트가 `new SceneInterop(JS)`로 만들고 직접 dispose한다.
+           이유: WASM에서 Scoped 서비스는 앱 수명이라 홈 방문마다 새로 만들어야 하는 씬과 수명이 맞지 않고, Transient `IAsyncDisposable`은 루트 컨테이너가 붙잡아 해제되지 않는다.
+         - 다른 컴포넌트나 페이지가 `IJSRuntime`으로 `./js/scene.js`를 직접 import하지 마라.
+      2. `Components/StarSystem.razor`(+ `StarSystem.razor.css`): 메인 화면. 파라미터는 `[Parameter, EditorRequired] public Universe Universe`.
+         - 상태는 씬 준비 중, 준비됨, 사용 불가 셋이다.
+         - 사용 불가가 아니면 전체 화면(`position: fixed; inset: 0`) 씬 호스트 `<div class="scene-host" @ref="...">`를 렌더링한다.
+           이 div 안에는 Blazor 자식을 두지 마라. 이유: 씬이 그 안에 캔버스를 넣고, Blazor가 그 자식을 건드리면 충돌한다.
+         - 첫 렌더 뒤(`OnAfterRenderAsync`의 firstRender) `InitAsync(호스트, Universe)`를 호출한다. `false`면 사용 불가로 바꾸고 씬 호스트 대신 `<ListHome>`을 렌더링한다.
+         - HUD 레이어: 씬 호스트의 형제로 그 위에 겹친다. 레이어 자체는 `pointer-events: none`이고, 이후 스텝의 상호작용 요소만 `pointer-events: auto`다.
+           이유: 캔버스 클릭(s5 이후)이 HUD 레이어에 막히면 안 된다. 상단 중앙에 `<h1>`(사이트 제목)과 `SELECT DESTINATION`(`.hud-label`)을 둔다.
+         - 사용 불가 상태에서도 같은 `<h1>`과 `SELECT DESTINATION`이 ListHome 위에 있다.
+         - `IAsyncDisposable`을 구현해 SceneInterop을 dispose한다.
+         - 씬을 `MainLayout`에 두지 마라. 이유: ADR-003, 씬은 홈 페이지가 생길 때 만들고 떠날 때 dispose한다.
+      3. `Pages/Home.razor`: `ContentLoader` 안에서 `PageMeta`와 `<StarSystem Universe="universe" />`만 렌더링한다.
+         s2에서 Home에 둔 h1, SELECT DESTINATION, ListHome은 StarSystem으로 옮긴다. 쓰이지 않게 된 `Home.razor.css` 규칙은 정리한다.
+      4. `wwwroot/index.html`의 `<head>`에 `<link rel="modulepreload" href="js/scene#[.{fingerprint}].js" />`를 추가한다(UX.md 3절).
+         `OverrideHtmlAssetPlaceholders`가 빌드 때 지문 자리표시자를 실제 경로로 바꾼다. 다른 줄은 바꾸지 마라.
+      5. 테스트:
+         - `StarSystemTests.cs`(bUnit, `JSInterop.SetupModule("./js/scene.js")`, `module.Setup<bool>("init", _ => true)`):
+           init이 true면 씬 호스트가 있고 ListHome 카드가 없다. init이 false면 ListHome이 보이고 씬 호스트가 없다.
+           import가 `JSException`을 던지면 ListHome이 보이고 예외가 밖으로 나가지 않는다. init 인자로 호스트의 ElementReference와 Universe가 넘어간다.
+           컴포넌트를 dispose하면 모듈의 `dispose`가 호출된다. 두 상태 모두 h1이 사이트 제목이다.
+         - `HomeTests.cs`: 기존 h1 검증이 계속 통과하도록 scene 모듈 JSInterop 설정만 추가한다. 목록형 홈 카드 테스트는 init이 false를 반환하는 설정으로 바꾼다. 검증 내용을 약하게 하지 마라.
+         - `StaticAssetTests.cs`: index.html에 `rel="modulepreload"` 링크가 있고, 지문 자리표시자를 뗀 경로 `js/scene.js`가 빌드 후 wwwroot에 존재한다.
+    expected_files:
+      - src/Loonaciaverse.Web/Services/SceneInterop.cs
+      - src/Loonaciaverse.Web/Components/StarSystem.razor
+      - src/Loonaciaverse.Web/Components/StarSystem.razor.css
+      - src/Loonaciaverse.Web/Pages/Home.razor
+      - src/Loonaciaverse.Web/Pages/Home.razor.css
+      - src/Loonaciaverse.Web/wwwroot/index.html
+      - tests/Loonaciaverse.Web.Tests/StarSystemTests.cs
+      - tests/Loonaciaverse.Web.Tests/HomeTests.cs
+      - tests/Loonaciaverse.Web.Tests/StaticAssetTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+
+  - id: s5-scene-focus
+    title: focus camera on bodies and report clicks from the scene
+    type: feat
+    scope: scene
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.2 카메라와 움직임", "4.3 상태", "4.5 입력", "4.6 HUD 레이아웃"),
+      docs/ARCHITECTURE.md ("레이어 규칙"의 씬 상태 규칙, "씬 모듈 계약"), docs/ADR.md (ADR-003),
+      scene/src/scene/*.ts (s3 구현: types, orbit, system, scene), scene/sandbox/main.ts.
+
+      씬 쪽만 바꾼다. C#(SceneInterop, StarSystem)은 s6과 s7에서 연결한다.
+
+      1. `scene/src/scene/camera.ts`: Three.js를 import하지 않는 순수 모듈. 벡터는 `{ x, y, z }` 객체로 다룬다.
+         - `Pose { position, target }`, `overviewPose(...)`(s3의 고정 시점 계산을 이리로 옮긴다), `focusPose(bodyPosition, bodyRadius, aspect): Pose`.
+           - 시선 방향은 overview와 같은 비스듬한 방향을 유지하고, 천체 반지름에 비례한 거리까지 다가간다.
+           - `aspect > 1`(가로 화면)이면 천체가 화면 중앙보다 약간 오른쪽에 보이도록 target을 카메라 기준 왼쪽으로 옮긴다. 이유: 왼쪽은 HUD 패널 자리다.
+           - `aspect <= 1`(세로 화면)이면 천체가 화면 위쪽 중앙에 보이도록 target을 카메라 기준 아래로 옮긴다. 이유: 아래쪽은 HUD 하단 시트(화면 높이 45% 이내) 자리다.
+         - `easeInOutCubic(t)`, `interpolatePose(from, to, t)`.
+         - 카메라 트윈(예: `CameraTween`): 시작 포즈, 목표 포즈, 길이(초)를 받고 `step(deltaSeconds): Pose`로 진행한다. 진행 중에 새 목표가 오면 현재 포즈에서 다시 시작한다.
+      2. `scene.ts`에 계약 함수를 추가한다.
+         - `export function focus(bodyId: string, immediate: boolean): void`: 알 수 없는 id는 무시한다. immediate면 즉시 그 포즈로 가고, 아니면 0.8초 ease-in-out 트윈으로 간다.
+         - `export function clearFocus(): void`: overview 포즈로 0.8초 트윈한다.
+         - `export function highlight(bodyId: string | null): void`: 키보드 포커스를 받은 천체를 호버와 같은 강조 상태로 둔다(s7의 천체 버튼이 부른다). 알 수 없는 id는 null로 다룬다.
+         - 공전은 "포커스 중, 호버 중, 강조 중" 중 하나라도 해당하면 멈춘다(UX.md 4.2: 클릭 대상이 움직이지 않게). 판정은 작은 순수 함수로 두고 테스트한다.
+         - 포커스한 천체는 공전이 멈춰 정지해 있으므로, 포즈는 호출 시점의 천체 위치로 계산한다. 컨테이너 크기가 바뀌면 현재 포커스의 포즈를 새 aspect로 다시 계산한다.
+         - `init` 전이나 `dispose` 뒤의 호출은 무시한다.
+         - 강조의 시각 표현(이름표 강조)은 s11에서 만든다. 지금은 상태와 공전 정지만 처리한다.
+      3. 포인터 입력. 씬 캔버스에 리스너를 달고 `dispose`에서 해제한다.
+         - 클릭(`click`): Raycaster로 천체를 고른다. 맞으면 `callbacks.invokeMethodAsync("OnBodyClicked", id)`, 빈 공간이면 `callbacks.invokeMethodAsync("OnBodyClicked", null)`을 호출한다.
+           이유: 빈 공간 클릭으로 HUD를 닫을지는 C#이 정한다(UX.md 4.4, 4.5). 반환된 Promise의 거부는 잡아서 무시한다. .NET 쪽이 이미 dispose됐을 수 있다.
+         - 호버(`pointermove`, `pointerType`이 `mouse`나 `pen`일 때만): 천체 위면 캔버스 커서를 `pointer`로, 아니면 기본으로 둔다. 캔버스를 벗어나면(`pointerleave`) 호버를 해제한다.
+         - 호버를 C#에 알리지 마라. 이유: UX.md의 호버 연출(이름표 강조, 커서, 공전 정지)은 모두 씬 안의 일이라 Blazor가 쓸 곳이 없다. 이 계약 변경은 s13에서 문서에 반영한다.
+         - 클릭해도 씬이 스스로 `focus`하지 마라. 알림만 보낸다. 이유: 선택 상태의 유일한 원천은 URL이고, Blazor가 URL을 해석해 `focus`를 명령한다(ADR-003).
+      4. sandbox: 천체별 FOCUS 버튼과 HIGHLIGHT 토글, CLEAR 버튼, immediate 체크박스를 추가한다.
+         가짜 callbacks가 `OnBodyClicked`를 받으면 그 천체로 `focus`(null이면 `clearFocus`)를 호출해 실제 앱 흐름을 흉내 낸다.
+      5. 테스트(Vitest):
+         - `camera.test.ts`: easing 경계값(0, 0.5, 1). 트윈이 0.8초에 목표 포즈에 도달한다. 진행 중에 목표가 바뀌면 그때의 현재 포즈에서 시작한다.
+           focusPose의 거리가 overview보다 가깝다. 가로 화면에서는 천체가 카메라 기준 오른쪽에, 세로 화면에서는 위쪽에 있다.
+           (카메라의 right·up 벡터와 "target → 천체" 벡터의 내적 부호로 검사한다.)
+         - 공전 정지 판정 함수의 모든 조합.
+         - `scene.test.ts`: init 전에 `focus`, `clearFocus`, `highlight`를 불러도 throw하지 않는다.
+    expected_files:
+      - scene/src/scene/*
+      - scene/sandbox/*
+    ac:
+      - npm test --prefix scene
+      - npm run build --prefix scene
+      - dotnet build
+    timeout_sec: 2400
+
+  - id: s6-home-focus-hud
+    title: sync body focus with URL and open body HUD
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.3 상태", "4.4 URL 규칙", "4.5 입력"의 클릭과 닫기, "4.6 HUD 레이아웃", "4.7 HUD 내용", "10. HUD 카피"),
+      docs/ARCHITECTURE.md ("레이어 규칙"의 씬 상태 규칙, "데이터 흐름"의 런타임: 홈), docs/ADR.md (ADR-003),
+      src/Loonaciaverse.Web/Services/SceneInterop.cs, Components/StarSystem.razor(+ .css), Components/BodyInfo.razor,
+      Components/TopBar.razor (NavigationManager.LocationChanged 구독 패턴), scene/src/scene/scene.ts, tests/Loonaciaverse.Web.Tests/StarSystemTests.cs.
+
+      씬 모듈의 현재 계약: `focus(bodyId: string, immediate: boolean)`, `clearFocus()`. 캔버스를 클릭하면 씬이 .NET 쪽의 `OnBodyClicked(id)`를 호출하고, 빈 공간이면 id가 `null`이다.
+      씬은 스스로 포커스하지 않는다. 선택 상태의 유일한 원천은 URL(`?focus=`)이고, 이 컴포넌트가 해석해 씬에 명령한다(ADR-003).
+
+      1. `SceneInterop`:
+         - `Task FocusAsync(string bodyId, bool immediate)`와 `Task ClearFocusAsync()`: 모듈 함수를 호출한다. 씬이 초기화되지 않았으면 아무것도 하지 않는다.
+           `JSException`은 삼킨다. 이유: 연출이 실패해도 HUD와 탐색은 동작해야 한다.
+         - `public event Func<string?, Task>? BodyClicked`와 `[JSInvokable] public Task OnBodyClicked(string? id)`: 받은 값을 이벤트로 전달한다.
+      2. `StarSystem`: URL 상태 기계(UX.md 4.3, 4.4).
+         - URL이 상태의 유일한 원천이다. "선택된 천체"를 컴포넌트 필드에 따로 두고 URL과 다르게 바꾸지 마라.
+         - 현재 URL에서 `focus` 쿼리 값을 읽는다(`NavigationManager.Uri` 파싱). `LocationChanged`를 구독해(TopBar 패턴) 다시 읽고 반영한다.
+           base 기준 경로가 루트(빈 경로)가 아니면 무시한다. 이유: 다른 페이지로 이동할 때도 이 컴포넌트가 dispose되기 전에 LocationChanged를 받는다.
+         - `focus`가 없으면 OVERVIEW, `Universe.Bodies`에 있는 id면 FOCUSED(id), 그 밖의 값이면 `NavigateTo("/", replace: true)`.
+         - 씬에 반영: 씬이 준비된 뒤 첫 반영은 `FocusAsync(id, immediate: true)`다. 이유: `/?focus=`로 직접 들어오거나 뒤로가기로 돌아오면 줌인 애니메이션 없이 시작한다.
+           그 뒤의 변화는 `FocusAsync(id, false)` 또는 `ClearFocusAsync()`로 반영한다. 같은 상태를 두 번 반영하지 않는다.
+         - 천체 선택(`BodyClicked`에 id가 옴):
+           - OVERVIEW에서 → `NavigateTo($"/?focus={id}", new NavigationOptions { HistoryEntryState = 마커 })`(push).
+           - FOCUSED(다른 id)에서 → `ReplaceHistoryEntry = true`로 이동하고, `HistoryEntryState`에는 현재 `NavigationManager.HistoryEntryState`를 그대로 넘긴다.
+           - 이미 FOCUSED인 같은 id면 아무것도 하지 않는다.
+           마커는 `StarSystem` 안의 상수 문자열이다. 이유: "이 세션에서 push한 포커스인가"를 history 항목 자체에 기록해야,
+           TRAVEL 뒤 뒤로가기로 돌아와 컴포넌트가 새로 만들어져도 판단이 유지된다.
+         - 닫기(`BodyClicked`에 null이 오거나 HUD의 ✕): FOCUSED일 때만 동작한다.
+           `NavigationManager.HistoryEntryState`가 마커면 `IJSRuntime`으로 `history.back`을 호출하고, 아니면 `NavigateTo("/", replace: true)`.
+           OVERVIEW에서 빈 공간을 클릭하면 아무것도 하지 않는다.
+         - 씬이 사용 불가(ListHome)면 `focus` 값에 따른 씬 호출과 HUD는 없다. 알 수 없는 값을 `/`로 replace하는 규칙은 그대로 적용한다.
+         - 컴포넌트 dispose 때 `LocationChanged`와 `BodyClicked` 구독을 해제한다.
+      3. `Components/HudPanel.razor`(+ `HudPanel.razor.css`): FOCUSED일 때 HUD 레이어에 뜨는 패널.
+         - 파라미터: `CelestialBody Body`, `HudStats Stats`, `EventCallback OnClose`.
+         - `BodyInfo`와 ✕ 버튼(`aria-label="CLOSE"`)을 담는다. TRAVEL 버튼은 s9에서 추가하니 지금 만들지 마라.
+         - 패널 전체가 `pointer-events: auto`다. 이유: 패널의 빈 곳을 클릭했을 때 클릭이 캔버스로 새어 HUD가 닫히면 안 된다.
+         - 레이아웃: 가로 화면은 왼쪽 정보 패널(UX.md 4.6 데스크톱 그림)이다. 세로 화면(`@media (max-aspect-ratio: 1/1)`)은 하단 시트(`max-height: 45dvh`, 내용은 시트 안에서 스크롤)다.
+           이유: 씬의 focusPose도 가로와 세로를 화면 비 1을 기준으로 나눈다.
+         - 배경은 `--color-surface`, 테두리는 `.hud-frame` 스타일이다. HUD를 캔버스 안에 그리지 마라(ADR-003).
+      4. 테스트(bUnit, `StarSystemTests.cs`에 추가하고 필요하면 `HudPanelTests.cs`를 만든다):
+         - 씬 콜백은 `init` 호출 인자의 세 번째 값(`DotNetObjectReference<SceneInterop>`)을 꺼내 `component.InvokeAsync(() => reference.Value.OnBodyClicked("blog"))`처럼 부른다.
+         - `history.back`은 `JSInterop.SetupVoid("history.back")`으로 설정하고 호출 여부를 검증한다. 탐색 기록은 bUnit의 `BunitNavigationManager.History`로 확인한다.
+         - 검증할 동작:
+           OVERVIEW에서 클릭하면 마커와 함께 push된다. FOCUSED에서 다른 천체를 클릭하면 마커를 유지한 채 replace된다. 같은 천체 클릭은 이동하지 않는다.
+           마커가 있는 상태에서 빈 공간 클릭이나 ✕는 `history.back`을 부른다. 마커 없이 `/?focus=blog`로 시작해 닫으면 `/`로 replace된다.
+           알 수 없는 `focus` 값은 `/`로 replace된다. `/?focus=blog`로 시작하면 init 뒤 `focus("blog", true)`가 호출된다.
+           그 뒤 URL이 바뀌면 `focus(id, false)`나 `clearFocus()`가 호출된다. OVERVIEW에서 빈 공간 클릭은 아무 일도 하지 않는다.
+           FOCUSED면 HudPanel에 그 천체의 BodyInfo가 보이고 OVERVIEW면 HudPanel이 없다. init이 false면 focus 호출이 없다.
+           루트가 아닌 경로로의 LocationChanged는 씬 호출을 만들지 않는다.
+    expected_files:
+      - src/Loonaciaverse.Web/Services/SceneInterop.cs
+      - src/Loonaciaverse.Web/Components/StarSystem.razor
+      - src/Loonaciaverse.Web/Components/StarSystem.razor.css
+      - src/Loonaciaverse.Web/Components/HudPanel.razor
+      - src/Loonaciaverse.Web/Components/HudPanel.razor.css
+      - tests/Loonaciaverse.Web.Tests/StarSystemTests.cs
+      - tests/Loonaciaverse.Web.Tests/HudPanelTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+    timeout_sec: 2400
+
+  - id: s7-keyboard
+    title: add keyboard navigation for bodies and HUD
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.5 입력"), src/Loonaciaverse.Web/App.razor (`FocusOnNavigate`), Components/StarSystem.razor(+ .css),
+      Components/HudPanel.razor, Components/BodyInfo.razor, Services/SceneInterop.cs, scene/src/scene/scene.ts (`highlight` 계약),
+      wwwroot/css/app.css, tests/Loonaciaverse.Web.Tests/StarSystemTests.cs.
+
+      씬 모듈에는 이미 `highlight(bodyId: string | null)`가 있다. 키보드 포커스를 받은 천체를 호버처럼 강조하고 공전을 멈춘다.
+      s6의 천체 선택(push/replace)과 닫기(마커가 있으면 `history.back`, 없으면 `/`로 replace) 경로를 그대로 재사용한다. 새 탐색 규칙을 만들지 마라.
+
+      1. `SceneInterop.HighlightAsync(string? bodyId)`: `FocusAsync`와 같은 규칙이다(초기화 전이면 무시, `JSException`은 삼킴).
+      2. 천체 버튼(`StarSystem`의 HUD 레이어):
+         - 천체마다 `<button>`을 `Universe.Bodies` 순서로 둔다. universe.yml이 about → projects → blog → playground 순서다.
+           접근 가능한 이름은 `"{Name} — {Subtitle}"`(예: `ARCHIVA — BLOG`)다.
+         - 버튼은 시각적으로 숨긴다. `app.css`에 `.visually-hidden` 유틸리티를 추가한다.
+           이유: 마우스 사용자에게는 3D 천체와 이름표가 이 역할을 하고, 키보드 포커스의 시각 표시는 씬의 강조가 맡는다.
+         - `focus` 이벤트 → `HighlightAsync(id)`, `blur` → `HighlightAsync(null)`.
+         - 클릭(Enter 포함) → s6의 천체 선택과 같은 경로.
+         - 씬이 준비됐을 때만 렌더링한다.
+      3. 키보드 처리:
+         - `StarSystem`의 루트 요소에 `tabindex="-1"`과 `@onkeydown`을 둔다.
+           이유: 캔버스나 HUD의 빈 곳을 클릭해도 포커스가 이 루트로 와서 Esc와 방향키를 받을 수 있다.
+           루트의 포커스 외곽선은 감춘다(`:focus { outline: none; }`). 자식의 `:focus-visible` 스타일은 그대로 둔다.
+         - `Escape`: FOCUSED면 s6의 닫기와 같은 경로.
+         - `ArrowLeft`/`ArrowRight`: FOCUSED일 때만 `Universe.Bodies` 순서의 이전/다음 천체로 FOCUSED(replace, 마커 유지). 양 끝에서는 반대쪽 끝으로 순환한다.
+           OVERVIEW에서는 아무것도 하지 않는다.
+      4. 포커스 관리:
+         - HUD가 열리면(새 FOCUSED 상태가 렌더링된 뒤) HUD 제목(천체 이름 `<h2>`)으로 포커스를 옮긴다(`FocusAsync(preventScroll: true)`).
+           직접 진입(`/?focus=blog`)과 다른 천체로 바뀐 경우도 같다. 이유: 키보드와 스크린 리더 사용자가 열린 HUD를 바로 읽을 수 있어야 한다.
+           이를 위해 `BodyInfo`의 `<h2>`에 `tabindex="-1"`을 달고, `BodyInfo`와 `HudPanel`에 `public ValueTask FocusHeadingAsync()`를 추가한다(HudPanel은 BodyInfo에 위임).
+         - FOCUSED에서 OVERVIEW로 바뀌면 포커스를 `StarSystem` 루트로 옮긴다(`preventScroll: true`).
+           숨겨진 천체 버튼으로 옮기지 마라. 이유: 버튼의 focus가 `highlight`를 불러, 마우스로 닫은 사용자에게도 엉뚱한 천체가 강조된다.
+         - App.razor의 `FocusOnNavigate`는 페이지 타입이 바뀔 때만 h1에 포커스를 주므로, 같은 홈에서 `?focus`만 바뀔 때는 이 처리와 충돌하지 않는다. App.razor를 고치지 마라.
+      5. 테스트(bUnit, `StarSystemTests.cs`):
+         버튼의 순서와 접근 가능한 이름. 버튼 focus/blur → `highlight(id)`/`highlight(null)`. 버튼 클릭 → OVERVIEW에서 push, FOCUSED에서 replace.
+         Esc 닫기(마커가 있을 때와 없을 때). ←/→가 순환하며 replace하고 마커를 유지한다. OVERVIEW에서 방향키는 무시된다.
+         HUD가 열리면 제목으로, 닫히면 루트로 `FocusAsync`가 호출된다(bUnit `JSInterop.VerifyFocusAsyncInvoke`). 씬이 사용 불가면 버튼이 없다.
+    expected_files:
+      - src/Loonaciaverse.Web/Services/SceneInterop.cs
+      - src/Loonaciaverse.Web/Components/StarSystem.razor
+      - src/Loonaciaverse.Web/Components/StarSystem.razor.css
+      - src/Loonaciaverse.Web/Components/HudPanel.razor
+      - src/Loonaciaverse.Web/Components/BodyInfo.razor
+      - src/Loonaciaverse.Web/wwwroot/css/app.css
+      - tests/Loonaciaverse.Web.Tests/StarSystemTests.cs
+      - tests/Loonaciaverse.Web.Tests/HudPanelTests.cs
+      - tests/Loonaciaverse.Web.Tests/BodyInfoTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+    timeout_sec: 2400
+
+  - id: s8-scene-warp
+    title: add warp transition to the scene
+    type: feat
+    scope: scene
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.3 상태"의 WARPING, "8. 디자인 토큰"의 `--color-bg`), docs/PRD.md ("1. 우주 메인 화면"의 TRAVEL 기준),
+      docs/ADR.md (ADR-003), scene/src/scene/*.ts, scene/sandbox/main.ts.
+
+      씬 쪽만 바꾼다. TRAVEL 버튼과 이동은 s9에서 Blazor가 만든다.
+
+      1. `scene/src/scene/warp.ts`: Three.js를 import하지 않는 순수 모듈.
+         - `WARP_DURATION_MS`: 1000 이하(예: 900). 이유: PRD는 1초 이내의 워프 뒤 이동을 요구한다.
+         - `warpTimeline(elapsedMs): { dash: number; streak: number; fade: number }`: 각 값은 0~1이고 시간에 따라 단조 증가한다.
+           카메라 돌진(dash)이 먼저 시작하고, 별 늘어남(streak)이 이어지고, 페이드(fade)가 마지막에 1에 도달한다.
+           `elapsedMs >= WARP_DURATION_MS`이면 모두 1이다.
+      2. `scene.ts`에 `export function warp(bodyId: string): Promise<void>`를 추가한다.
+         - 카메라가 그 천체 쪽으로 가속하며 돌진한다(현재 포즈에서 천체 중심 방향).
+         - 별이 진행 방향으로 길게 늘어난다(star streak). 예: 별을 시선 방향 선분으로 그리는 레이어를 두고 그 길이를 streak에 비례하게 조절한다.
+         - 씬이 컨테이너 안에 만든 오버레이(배경색 `#05070d`, `--color-bg`와 같은 값)의 불투명도가 fade를 따른다. 오버레이는 `dispose`에서 제거한다.
+         - Promise는 애니메이션 프레임이 아니라 타이머(`setTimeout(WARP_DURATION_MS)`)로 resolve한다. 이유: 탭이 숨겨져 rAF가 멈춰도 TRAVEL 이동이 막히면 안 된다.
+         - 워프 중에는 클릭과 호버 입력, `focus`, `clearFocus`, `highlight` 호출을 무시한다.
+         - 알 수 없는 id이거나 초기화 전이면 즉시 resolve한다. 워프 중에 `dispose`가 불리면 Promise를 resolve하고 정리한다.
+         - 씬이 라우팅하지 마라. 이동은 Promise가 끝난 뒤 Blazor가 한다(ADR-003).
+      3. sandbox: 천체별 WARP 버튼을 추가한다. 워프가 끝나고 1초 뒤 씬을 다시 init해 연출을 반복해서 볼 수 있게 한다.
+      4. 테스트(Vitest):
+         - `warp.test.ts`: `WARP_DURATION_MS <= 1000`. 0과 끝에서의 경계값. 단조 증가. dash가 streak보다 먼저 0을 벗어나고, fade가 마지막에 1에 도달한다.
+         - `scene.test.ts`: 초기화 전 `warp`가 즉시 resolve한다.
+    expected_files:
+      - scene/src/scene/*
+      - scene/sandbox/*
+    ac:
+      - npm test --prefix scene
+      - npm run build --prefix scene
+      - dotnet build
+    timeout_sec: 2400
+
+  - id: s9-travel
+    title: add TRAVEL button that warps to the detail page
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.3 상태", "4.6 HUD 레이아웃"의 TRAVEL 위치, "4.7 HUD 내용"의 playground, "8. 디자인 토큰"의 `--color-locked`),
+      docs/PRD.md ("1. 우주 메인 화면"), src/Loonaciaverse.Web/Services/SceneInterop.cs, Components/StarSystem.razor(+ .css),
+      Components/HudPanel.razor(+ .css), scene/src/scene/scene.ts (`warp` 계약), tests/Loonaciaverse.Web.Tests/StarSystemTests.cs, HudPanelTests.cs.
+
+      씬 모듈의 `warp(bodyId): Promise<void>`는 1초 이내에 resolve하고, 씬은 라우팅하지 않는다.
+
+      1. `SceneInterop.WarpAsync(string bodyId)`: `warp`를 await한다. 초기화 전이면 바로 끝난다. `JSException`은 삼킨다.
+      2. `HudPanel`: TRAVEL 버튼과 `EventCallback OnTravel`을 추가한다.
+         - 가로 화면에서는 화면 하단 중앙, 세로 화면에서는 시트 하단에 꽉 찬 너비로 둔다(UX.md 4.6).
+         - 천체가 잠겼거나 `Route`가 null이면 버튼은 `disabled`이고 색은 `--color-locked`다.
+      3. `StarSystem`:
+         - TRAVEL → WARPING(id): HUD 패널과 천체 버튼을 숨기고, `WarpAsync(id)`를 기다린 뒤 `NavigateTo(Body.Route)`(push)로 이동한다.
+         - `WarpAsync`가 어떻게 끝나든(예외 포함) 이동한다. 이유: 연출 실패가 탐색을 막으면 안 된다.
+         - WARPING 중에는 씬 클릭 알림, 키보드 입력, 버튼 입력, LocationChanged 반영을 모두 무시한다.
+         - 잠긴 천체는 WARPING으로 가지 않는다.
+      4. 테스트(bUnit):
+         - TRAVEL을 누르면 `warp(id)`가 호출되고, warp가 끝난 뒤에만 route로 push된다. warp 핸들러를 끝나지 않은 상태로 두고 이동 전 상태를 먼저 검증한 뒤 완료시킨다.
+         - 워프 중 클릭 알림, Esc, 방향키가 무시된다. warp가 `JSException`을 던져도 이동한다.
+         - 잠긴 천체의 TRAVEL은 disabled이고 warp가 호출되지 않는다. HudPanel이 TRAVEL을 렌더링한다.
+    expected_files:
+      - src/Loonaciaverse.Web/Services/SceneInterop.cs
+      - src/Loonaciaverse.Web/Components/StarSystem.razor
+      - src/Loonaciaverse.Web/Components/StarSystem.razor.css
+      - src/Loonaciaverse.Web/Components/HudPanel.razor
+      - src/Loonaciaverse.Web/Components/HudPanel.razor.css
+      - tests/Loonaciaverse.Web.Tests/StarSystemTests.cs
+      - tests/Loonaciaverse.Web.Tests/HudPanelTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+
+  - id: s10-procedural-shaders
+    title: draw bodies and nebula with procedural shaders
+    type: feat
+    scope: scene
+    description: |
+      먼저 읽을 파일: docs/ADR.md (ADR-007), docs/UX.md ("4.1 천체"), docs/ARCHITECTURE.md ("콘텐츠 모델"의 천체 visual),
+      content/universe.yml, scene/src/scene/system.ts, scene/src/scene/types.ts, scene/src/scene/scene.ts.
+
+      s3의 단순 재질을 노이즈 기반 절차적 셰이더로 바꾼다. 천체 사이의 모습 차이는 universe.yml의 `visual` 파라미터에서만 온다.
+
+      1. `scene/src/scene/materials.ts`(GLSL은 같은 폴더의 `.ts` 파일에 템플릿 문자열로 둔다):
+         - `createPlanetMaterial(visual)`: `ShaderMaterial`. 3D 노이즈 fbm으로 표면 무늬를 만든다. 유니폼은 `uBaseColor`(baseColor), `uNoiseScale`(noiseScale), `uTime`(아주 느린 흐름)이다.
+           항성 방향의 조명(Lambert)으로 낮과 밤 면을 나눈다.
+         - `createAtmosphereMaterial(visual)`: 행성보다 약간 큰 구에 쓰는 fresnel 림 발광. `uAtmosphereColor`, 세기는 `glowIntensity`. additive blending, `transparent: true`, `depthWrite: false`.
+         - `createStarMaterial(visual)`: 노이즈로 밝기가 요동하는 자체 발광 표면. 코로나 글로우는 카메라를 향하는 평면에 방사형 감쇠 셰이더로 그리고, 세기는 `glowIntensity`다.
+         - 배경 성운: 큰 구의 안쪽 면(`BackSide`)에 저주파 노이즈로 아주 옅은 색 얼룩을 그린다. 별 필드보다 뒤에 있고, 정보 가독성을 해치지 않을 만큼 어둡게 둔다.
+         - 외부에서 가져온 노이즈 GLSL이 있으면 출처와 라이선스(MIT 등)를 주석으로 남긴다.
+         - 셰이더는 Three.js `ShaderMaterial`이 WebGL2에서 지원하는 기본 문법만 쓴다.
+      2. `system.ts`가 s3의 단순 재질 대신 이 재질들을 쓴다. 항성 판별은 지금처럼 orbit이 null인지로 한다.
+         id별 분기로 모습을 바꾸지 마라. 이유: ADR-007, 새 천체의 모습은 셰이더 파라미터로만 바꾼다.
+         `update`에서 `uTime`을 갱신한다. s3의 `PointLight`가 더 이상 필요 없으면 제거한다.
+      3. `dispose`에서 새 재질과 지오메트리도 해제한다.
+      4. 텍스처 이미지 파일, glTF, HDR 환경맵, 외부 셰이더 패키지를 추가하지 마라. 런타임에 `CanvasTexture`를 그리는 것도 하지 마라. 이유: ADR-007, 전송량 예산.
+      5. 테스트(Vitest):
+         - 재질 유니폼이 visual 값과 일치한다(색은 `Color`로 비교).
+         - 항성과 행성이 각각 맞는 재질을 쓴다. 대기 재질은 additive, transparent, depthWrite false다.
+         - 각 셰이더 문자열이 재질이 넘기는 유니폼을 모두 선언한다(예: `uniform vec3 uBaseColor`). 이유: 오타로 유니폼이 연결되지 않는 실수를 잡는다.
+         - 시스템을 dispose하면 재질의 `dispose`가 호출된다.
+         GLSL 컴파일 오류는 WebGL이 없는 테스트 환경에서 잡을 수 없다. 문법을 보수적으로 쓰고, 셰이더마다 무엇을 하는지 짧은 주석을 단다.
+    expected_files:
+      - scene/src/scene/*
+      - scene/sandbox/*
+    ac:
+      - npm test --prefix scene
+      - npm run build --prefix scene
+      - dotnet build
+    timeout_sec: 2400
+
+  - id: s11-labels-ring
+    title: add body name labels and focus hologram ring
+    type: feat
+    scope: scene
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.2 카메라와 움직임"의 이름표, "4.3 상태"의 홀로그램 링, "4.5 입력"의 호버, "8. 디자인 토큰"),
+      docs/ADR.md (ADR-003의 이름표 예외, ADR-007), scene/src/scene/*.ts, src/Loonaciaverse.Web/wwwroot/css/app.css,
+      src/Loonaciaverse.Web/Components/StarSystem.razor.css (씬 호스트와 HUD 레이어의 쌓임 순서).
+
+      1. 이름표(`three/addons/renderers/CSS2DRenderer.js`):
+         - 씬이 `init`에서 CSS2DRenderer를 만들어 그 요소를 컨테이너 안 캔버스 위에 겹치고, `dispose`에서 제거한다. 리사이즈 때 크기도 갱신한다.
+         - 천체마다 `<div class="scene-label"><span class="scene-label-name">ARCHIVA</span><span class="scene-label-subtitle">BLOG</span></div>`를 천체 옆(화면에서 겹치지 않는 오프셋)에 둔다.
+         - 상태 규칙은 순수 함수 `labelState(bodyId, focusedId, emphasizedId): "hidden" | "normal" | "emphasized"`로 둔다.
+           포커스된 천체의 이름표는 숨긴다(UX.md 4.2: 포커스되지 않은 천체 옆에 띄운다). 호버나 `highlight` 중인 천체는 강조(`is-emphasized` 클래스)한다.
+         - 라벨 클릭은 그 천체 클릭과 같고(`OnBodyClicked(id)`), 라벨 위 호버는 그 천체 호버와 같다.
+           CSS2DRenderer의 루트 요소는 `pointer-events: none`, 라벨만 `pointer-events: auto`다. 이유: 라벨 밖은 캔버스가 클릭을 받아야 한다.
+         - 워프 중에는 모든 라벨을 숨긴다.
+         - 스타일은 `app.css`에 `.scene-label` 접두사로 둔다. 이유: 씬이 만든 DOM이라 Blazor CSS 격리가 닿지 않는다.
+           라벨은 영어 대문자라 `--font-hud`와 `letter-spacing: 0.12em`을 쓴다. 기본 색은 `--color-text`, 강조 때는 `--color-hud`다.
+         - 쌓임 순서: 라벨 레이어는 캔버스 위, Blazor HUD 레이어 아래다. 씬 호스트 안에 있으므로 보통 그대로 맞는다. StarSystem.razor.css를 확인만 하고, 고쳐야 하면 decisions에 이유를 적는다.
+      2. 홀로그램 링: 포커스된 천체를 감싸는 얇은 링(링 지오메트리나 라인 + 셰이더). 눈금이나 점선 무늬가 있고 천천히 회전한다.
+         - `focus`하면 그 천체로 옮겨 페이드인하고, `clearFocus`하면 페이드아웃한다. 워프 중에는 숨긴다.
+         - 색은 `getComputedStyle(document.documentElement).getPropertyValue("--color-hud")`를 읽고, 비어 있으면 `#5fd4ff`를 쓴다. 이유: HUD 색 토큰을 한 곳에서 관리한다.
+         - 텍스처를 쓰지 마라(ADR-007).
+      3. 테스트(Vitest):
+         - `labelState`의 모든 조합.
+         - 라벨 생성 함수가 만드는 DOM 구조와 텍스트(happy-dom에서 직접 호출).
+         - 라벨 클릭이 클릭 핸들러를 그 천체 id로 부른다.
+         - 링 표시 여부나 투명도 목표를 정하는 순수 함수가 있으면 그 경계값.
+    expected_files:
+      - scene/src/scene/*
+      - scene/sandbox/*
+      - src/Loonaciaverse.Web/wwwroot/css/app.css
+    ac:
+      - npm test --prefix scene
+      - npm run build --prefix scene
+      - dotnet build
+      - dotnet test
+    timeout_sec: 2400
+
+  - id: s12-render-quality
+    title: add render quality tiers with bloom and parallax
+    type: feat
+    scope: scene
+    description: |
+      먼저 읽을 파일: docs/UX.md ("4.2 카메라와 움직임"의 패럴랙스, "9. 렌더 품질 단계"), docs/PRD.md ("제약"의 성능 예산), scene/src/scene/*.ts.
+
+      1. `scene/src/scene/quality.ts`: 순수 모듈.
+         - `getQuality({ devicePixelRatio, coarsePointer, viewportWidth }): { pixelRatio: number; starCount: number; bloom: boolean; parallax: boolean }`.
+         - 모바일은 `coarsePointer || viewportWidth < 768`이다.
+           데스크톱: pixelRatio `min(dpr, 2)`, 블룸 켬, 패럴랙스 켬, 별 개수 N. 모바일: pixelRatio `min(dpr, 1.5)`, 블룸 끔, 패럴랙스 끔, 별 개수 N/2 이하.
+         - `init`에서 `matchMedia("(pointer: coarse)")`와 컨테이너 너비로 한 번 정한다. s3의 픽셀 비율 계산과 별 개수 상수를 이 결과로 바꾼다.
+      2. 블룸: `three/addons`의 `EffectComposer`, `RenderPass`, `UnrealBloomPass`, `OutputPass`. 항성 코로나와 대기가 은은하게 번지는 정도로 약하게 둔다.
+         블룸이 꺼진 단계에서는 composer 없이 기존처럼 렌더한다. 리사이즈 때 composer 크기도 갱신하고, `dispose`에서 해제한다.
+         CSS2DRenderer 이름표 렌더는 그대로 유지한다.
+      3. 패럴랙스: 마우스 위치(NDC)에 따라 카메라를 최대 2° 정도 흔든다.
+         - 순수 함수 `parallaxOffset(pointerNdc, maxDegrees)`로 오프셋 각도를 계산하고, 렌더할 때 부드럽게 따라가게(lerp) 한다.
+         - 카메라 트윈이 계산한 포즈 위에 오프셋을 더해 렌더한다. 트윈 상태 자체를 바꾸지 마라. 이유: 트윈 계산이 오염되면 포커스 위치가 어긋난다.
+         - 패럴랙스가 꺼진 단계(터치, 모바일)와 워프 중에는 적용하지 않는다(UX.md 4.2).
+      4. 테스트(Vitest):
+         - `getQuality`: 데스크톱, coarse 포인터, 좁은 화면 각각의 결과, dpr 상한(2와 1.5), 모바일 별 개수가 데스크톱의 절반 이하.
+         - `parallaxOffset`: 중앙에서 0, 가장자리에서도 최대 각도 이내, 방향 부호.
+    expected_files:
+      - scene/src/scene/*
+    ac:
+      - npm test --prefix scene
+      - npm run build --prefix scene
+      - dotnet build
+    timeout_sec: 2400
+
+  - id: s13-docs
+    title: document main screen scene contract and home flow
+    type: docs
+    description: |
+      먼저 읽을 파일: docs/ARCHITECTURE.md 전체, docs/UX.md ("4. 메인 화면"), 이 계획에서 만든 코드:
+      scene/src/scene/*.ts, scene/sandbox/*, scene/package.json, src/Loonaciaverse.Web/Services/SceneInterop.cs,
+      Components/StarSystem.razor, Components/HudPanel.razor, Components/BodyInfo.razor, Components/ListHome.razor.
+
+      문서를 실제 구현에 맞춘다. 이미 구현한 부분의 실제 방식만 고치거나 보충하고, 아직 구현하지 않은 설계는 지우지 마라
+      (CI/CD, staticwebapp.config.json, 전송량 예산 검사, 프리렌더링, 공통 OG 등).
+      이유: ARCHITECTURE.md는 현재 상태가 아니라 목표 설계 문서이고, 다음 계획이 그 설계를 따른다.
+
+      1. docs/ARCHITECTURE.md:
+         - "씬 모듈 계약": `init(container: HTMLElement, ...)`(씬이 캔버스와 이름표 레이어를 컨테이너 안에 만든다, reduced-motion이면 false), `highlight(bodyId | null)` 추가,
+           `warp`가 타이머로 1초 이내에 resolve한다는 점, C# 콜백이 `[JSInvokable] OnBodyClicked(string? id)`(null은 빈 공간) 하나이고 호버는 씬 안에서만 처리한다는 점.
+           순수 로직 모듈 목록(orbit, camera, warp, quality 등 실제 파일)을 적는다.
+         - "데이터 흐름"의 런타임: 홈: `StarSystem` 컴포넌트가 씬과 HUD를 맡는다는 점, `SceneInterop`을 DI 없이 컴포넌트가 만들고 dispose하는 이유,
+           `?focus` 해석과 history 항목의 마커(`HistoryEntryState`)로 닫기 방식(`history.back` 또는 `/`로 replace)을 정하는 방식.
+         - "디렉토리 구조": Components의 StarSystem, HudPanel, BodyInfo, ListHome, `scene/src/scene/`의 모듈 구성, `scene/sandbox/`와 `npm run dev --prefix scene`.
+         - "테스트" 표: URL과 포커스의 규칙은 Vitest가 아니라 bUnit이 검증한다는 점, 씬 순수 로직의 실제 범위.
+         - "레이어 규칙"에서 "씬은 클릭과 호버 이벤트만 C#으로 알린다"를 실제(클릭만 알린다)에 맞춘다.
+      2. docs/UX.md: 구현하며 정한 세부만 보충한다. ←/→가 양 끝에서 순환한다. 이름표를 클릭하면 그 천체를 클릭한 것과 같다.
+         가로/세로 레이아웃의 기준이 화면 비 1이다. HUD가 열리면 포커스가 HUD 제목으로, 닫히면 메인 화면 루트로 간다.
+      3. docs/PRD.md와 docs/ADR.md는 고치지 마라. 이유: 이 계획의 결정은 PRD 범위나 ADR 수준의 결정을 바꾸지 않는다.
+    expected_files:
+      - docs/ARCHITECTURE.md
+      - docs/UX.md
+    ac:
+      - dotnet build
+      - dotnet test
+      - npm test --prefix scene
