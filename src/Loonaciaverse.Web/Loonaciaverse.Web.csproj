@@ -69,7 +69,7 @@
     <ItemGroup>
       <_ExistingSceneContent Include="wwwroot\js\**\*" />
     </ItemGroup>
-    <Delete Files="$(_SceneBuildStamp)" Condition="!Exists('wwwroot/js/highlight.js') Or !Exists('wwwroot/js/toc.js') Or !Exists('$(_SceneDirectory)/node_modules')" />
+    <Delete Files="$(_SceneBuildStamp)" Condition="!Exists('wwwroot/js/highlight.js') Or !Exists('wwwroot/js/toc.js') Or !Exists('wwwroot/js/scene.js') Or !Exists('$(_SceneDirectory)/node_modules')" />
     <Exec Command="npm ci" WorkingDirectory="$(_SceneDirectory)" Condition="!Exists('$(_SceneDirectory)/node_modules')" />
   </Target>
 

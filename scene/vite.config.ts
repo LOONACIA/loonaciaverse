@@ -3,7 +3,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   build: {
     lib: {
-      entry: { highlight: "src/highlight.ts", toc: "src/toc.ts" },
+      entry: { highlight: "src/highlight.ts", toc: "src/toc.ts", scene: "src/scene/scene.ts" },
       formats: ["es"],
       fileName: (_format, name) => `${name}.js`,
     },

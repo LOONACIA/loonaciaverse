@@ -1,0 +1,45 @@
+/// <reference types="vite/client" />
+
+import { dispose, init } from "../src/scene/scene";
+import type { UniverseDto } from "../src/scene/types";
+
+// Scene fields from content/universe.yml; this fixture is only used by the sandbox.
+const universe: UniverseDto = {
+  bodies: [
+    {
+      id: "about", name: "LOONACIA", subtitle: "ABOUT", locked: false,
+      visual: { baseColor: "#fff2cc", atmosphereColor: "#ffd780", noiseScale: 3.5, glowIntensity: 1.8 },
+      orbit: null,
+    },
+    {
+      id: "projects", name: "ARTIFEX", subtitle: "PROJECTS", locked: false,
+      visual: { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4.0, glowIntensity: 0.4 },
+      orbit: { radius: 8.0, periodSeconds: 75.0, phase: 0.5 },
+    },
+    {
+      id: "blog", name: "ARCHIVA", subtitle: "BLOG", locked: false,
+      visual: { baseColor: "#6956a8", atmosphereColor: "#bda5ff", noiseScale: 5.0, glowIntensity: 0.3 },
+      orbit: { radius: 12.0, periodSeconds: 100.0, phase: 2.5 },
+    },
+    {
+      id: "playground", name: "ARCADIA", subtitle: "PLAYGROUND", locked: true,
+      visual: { baseColor: "#785339", atmosphereColor: "#ffb347", noiseScale: 6.0, glowIntensity: 0.2 },
+      orbit: { radius: 16.0, periodSeconds: 120.0, phase: 4.5 },
+    },
+  ],
+};
+
+const container = document.getElementById("scene")!;
+const initialized = init(container, universe, {
+  async invokeMethodAsync(methodName, ...args) {
+    console.log(methodName, ...args);
+  },
+});
+if (!initialized) {
+  container.textContent = "Scene unavailable: WebGL2 is required and reduced motion must be off.";
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(dispose);
+}
+
