@@ -13,7 +13,7 @@ public class PostBuilderTests
         using var directory = new TemporaryDirectory();
         var contentDir = Path.Combine(directory.Root, "source");
         var outputDir = Path.Combine(directory.Root, "wwwroot");
-        WritePost(contentDir, "first-folder", """
+        WritePost(contentDir, "beta", """
             ---
             title: 두 번째 글
             slug: beta
@@ -23,7 +23,7 @@ public class PostBuilderTests
             ---
             본문입니다.
             """);
-        WritePost(contentDir, "second-folder", $$"""
+        WritePost(contentDir, "alpha", $$"""
             ---
             title: 첫 번째 글
             slug: alpha
@@ -45,7 +45,7 @@ public class PostBuilderTests
             <iframe src="https://example.com/embed"></iframe>
             """);
 
-        var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, false));
+        var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, true));
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);

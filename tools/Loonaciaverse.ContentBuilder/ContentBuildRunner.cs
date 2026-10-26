@@ -18,8 +18,7 @@ public static class ContentBuildRunner
             }
 
             Directory.CreateDirectory(contentOutputDir);
-            PostBuilder.Build(options.ContentDir, contentOutputDir);
-            return new BuildResult([]);
+            return PostBuilder.Build(options.ContentDir, contentOutputDir, options.IncludeDrafts);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
