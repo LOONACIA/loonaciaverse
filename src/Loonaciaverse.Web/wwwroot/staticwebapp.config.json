@@ -1,0 +1,9 @@
+{
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/_framework/*", "/content/*", "/js/*", "/css/*", "/fonts/*", "*.{css,js,json,wasm,xml,txt,png,jpg,jpeg,gif,svg,webp,ico,woff2}"]
+  },
+  "routes": [
+    { "route": "/content/*", "headers": { "Cache-Control": "no-cache" } }
+  ]
+}
