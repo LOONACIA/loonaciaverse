@@ -1,6 +1,72 @@
-<div class="prose">@((MarkupString)Html)</div>
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="prose" @ref="body">@((MarkupString)Html)</div>
 
 @code {
     [Parameter, EditorRequired]
     public string Html { get; set; } = string.Empty;
+
+    private ElementReference body;
+    private Task<IJSObjectReference>? moduleTask;
+    private string? highlightedHtml;
+    private bool disposed;
+    private readonly SemaphoreSlim highlightLock = new(1, 1);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await highlightLock.WaitAsync();
+        try
+        {
+            if (disposed || Html == highlightedHtml)
+            {
+                return;
+            }
+
+            var module = await (moduleTask ??= JS.InvokeAsync<IJSObjectReference>("import", "./js/highlight.js").AsTask());
+            if (disposed)
+            {
+                return;
+            }
+
+            var html = Html;
+            await module.InvokeVoidAsync("highlightAll", body);
+            highlightedHtml = html;
+        }
+        catch (JSException)
+        {
+            // Syntax highlighting is optional; the rendered content remains readable.
+        }
+        finally
+        {
+            highlightLock.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
+        await highlightLock.WaitAsync();
+        try
+        {
+            if (moduleTask is not null)
+            {
+                var module = await moduleTask;
+                await module.DisposeAsync();
+            }
+        }
+        catch (JSException)
+        {
+            // A failed import or disconnected runtime needs no further cleanup.
+        }
+        finally
+        {
+            highlightLock.Release();
+        }
+    }
 }

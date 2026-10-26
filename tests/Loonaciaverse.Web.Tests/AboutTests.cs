@@ -29,6 +29,7 @@ public class AboutTests
     {
         using var context = new BunitContext();
         var profile = TestContent.About();
+        context.JSInterop.SetupModule("./js/highlight.js").SetupVoid("highlightAll", _ => true).SetVoidResult();
         var service = new FakeContentService { GetAboutAsyncHandler = _ => Task.FromResult(profile) };
         context.Services.AddSingleton<IContentService>(service);
 
@@ -63,6 +64,7 @@ public class AboutTests
     {
         using var context = new BunitContext();
         var profile = TestContent.About() with { Github = github, Linkedin = linkedin };
+        context.JSInterop.SetupModule("./js/highlight.js").SetupVoid("highlightAll", _ => true).SetVoidResult();
         context.Services.AddSingleton<IContentService>(new FakeContentService { GetAboutAsyncHandler = _ => Task.FromResult(profile) });
 
         var component = context.Render<About>();
@@ -79,6 +81,7 @@ public class AboutTests
         using var context = new BunitContext();
         context.Services.AddSingleton<IContentService>(new FakeContentService { GetAboutAsyncHandler = _ => Task.FromResult(TestContent.About()) });
         var universe = TestContent.Universe();
+        context.JSInterop.SetupModule("./js/highlight.js").SetupVoid("highlightAll", _ => true).SetVoidResult();
 
         var component = context.Render<CascadingValue<Universe>>(parameters => parameters.Add(p => p.Value, universe).AddChildContent<About>());
 
@@ -95,6 +98,7 @@ public class AboutTests
             GetAboutAsyncHandler = _ => Task.FromResult(TestContent.About())
         });
         context.JSInterop.Setup<string>("Blazor._internal.PageTitle.getAndRemoveExistingTitle").SetResult(string.Empty);
+        context.JSInterop.SetupModule("./js/highlight.js").SetupVoid("highlightAll", _ => true).SetVoidResult();
         context.Services.GetRequiredService<NavigationManager>().NavigateTo("/about");
         var head = context.Render<HeadOutlet>();
 

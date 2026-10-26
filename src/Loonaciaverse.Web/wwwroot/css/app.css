@@ -231,6 +231,53 @@ a {
     background: transparent;
 }
 
+.prose .hljs-keyword,
+.prose .hljs-selector-tag,
+.prose .hljs-tag,
+.prose .hljs-meta {
+    color: var(--color-hud);
+}
+
+.prose .hljs-string,
+.prose .hljs-regexp,
+.prose .hljs-template-tag,
+.prose .hljs-addition {
+    color: var(--color-locked);
+}
+
+.prose .hljs-comment,
+.prose .hljs-quote {
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.prose .hljs-number,
+.prose .hljs-literal,
+.prose .hljs-symbol,
+.prose .hljs-bullet,
+.prose .hljs-deletion {
+    color: var(--color-danger);
+}
+
+.prose .hljs-title,
+.prose .hljs-type,
+.prose .hljs-built_in,
+.prose .hljs-attr,
+.prose .hljs-attribute,
+.prose .hljs-selector-class,
+.prose .hljs-selector-id {
+    color: var(--color-hud);
+}
+
+.prose .hljs-emphasis {
+    font-style: italic;
+}
+
+.prose .hljs-strong,
+.prose .hljs-section {
+    font-weight: 700;
+}
+
 .prose img {
     max-width: 100%;
     height: auto;

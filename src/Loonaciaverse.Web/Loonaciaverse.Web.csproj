@@ -21,6 +21,8 @@
                       GlobalPropertiesToRemove="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;SelfContained" />
     <_ContentSource Include="../../content/**/*" />
     <Watch Include="../../content/**/*" />
+    <_SceneSource Include="../../scene/src/**/*;../../scene/package.json;../../scene/package-lock.json;../../scene/vite.config.ts;../../scene/tsconfig.json" />
+    <Watch Include="../../scene/src/**/*" />
   </ItemGroup>
 
   <Target Name="PrepareContentBuild" DependsOnTargets="ResolveProjectReferences">
@@ -54,6 +56,35 @@
       <Content Remove="@(_ExistingGeneratedContent)" />
       <Content Include="wwwroot\content\**\*;wwwroot\feed.xml;wwwroot\sitemap.xml;wwwroot\robots.txt" CopyToPublishDirectory="PreserveNewest" />
       <FileWrites Include="$(_ContentBuildStamp);$(_ContentBuildInputs)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="PrepareSceneBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_SceneBuildStamp>$(IntermediateOutputPath)scene-bundle.stamp</_SceneBuildStamp>
+      <_SceneBuildInputs>$(BaseIntermediateOutputPath)scene-bundle.inputs</_SceneBuildInputs>
+      <_SceneDirectory>$(MSBuildProjectDirectory)/../../scene</_SceneDirectory>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(_SceneBuildInputs)" Lines="@(_SceneSource->'%(FullPath)')" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <_ExistingSceneContent Include="wwwroot\js\**\*" />
+    </ItemGroup>
+    <Delete Files="$(_SceneBuildStamp)" Condition="!Exists('wwwroot/js/highlight.js') Or !Exists('$(_SceneDirectory)/node_modules')" />
+    <Exec Command="npm ci" WorkingDirectory="$(_SceneDirectory)" Condition="!Exists('$(_SceneDirectory)/node_modules')" />
+  </Target>
+
+  <Target Name="BuildSceneBundle" DependsOnTargets="PrepareSceneBuild" Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(_SceneSource);$(_SceneBuildInputs);$(MSBuildProjectFullPath)" Outputs="$(_SceneBuildStamp)">
+    <Exec Command="npm run build" WorkingDirectory="$(_SceneDirectory)" />
+    <Touch Files="$(_SceneBuildStamp)" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="IncludeGeneratedSceneContent" BeforeTargets="ResolveProjectStaticWebAssets" DependsOnTargets="BuildSceneBundle"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <Content Remove="@(_ExistingSceneContent)" />
+      <Content Include="wwwroot\js\**\*" CopyToPublishDirectory="PreserveNewest" />
+      <FileWrites Include="$(_SceneBuildStamp);$(_SceneBuildInputs)" />
     </ItemGroup>
   </Target>
 
