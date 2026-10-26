@@ -1,0 +1,23 @@
+<div class="list-home">
+    @foreach (var body in Universe.Bodies)
+    {
+        <article @key="body.Id" class="hud-frame" aria-label="@body.Name">
+            <BodyInfo Body="body" Stats="Universe.Stats" />
+            <footer>
+                @if (!body.Locked && body.Route is { } route)
+                {
+                    <a class="travel" href="@route">TRAVEL</a>
+                }
+                else
+                {
+                    <span class="travel" aria-disabled="true">TRAVEL</span>
+                }
+            </footer>
+        </article>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Universe Universe { get; set; } = default!;
+}

@@ -1,0 +1,37 @@
+.list-home {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+article {
+    min-width: 0;
+    padding: clamp(1rem, 4vw, 2rem);
+}
+
+footer {
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--color-hud-dim);
+}
+
+.travel {
+    display: block;
+    padding: 0.65rem 1rem;
+    border: 1px solid var(--color-hud-dim);
+    font-family: var(--font-hud);
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    letter-spacing: 0.12em;
+}
+
+a.travel:hover {
+    border-color: var(--color-hud);
+    background: var(--color-bg);
+}
+
+.travel[aria-disabled="true"] {
+    border-color: var(--color-locked);
+    color: var(--color-locked);
+}

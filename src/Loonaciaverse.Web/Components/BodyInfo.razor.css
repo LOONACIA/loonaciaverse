@@ -1,0 +1,130 @@
+.body-info {
+    font-family: var(--font-body);
+    overflow-wrap: anywhere;
+}
+
+h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.1rem, 4vw, 1.75rem);
+    font-weight: 400;
+    line-height: 1.5;
+}
+
+.body-subtitle {
+    margin: 0.5rem 0;
+}
+
+.body-tagline {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+}
+
+dl {
+    margin: 1.5rem 0 0;
+}
+
+dt {
+    margin-top: 1.25rem;
+    font-weight: 600;
+}
+
+dd {
+    margin: 0.25rem 0 0;
+    font-family: var(--font-body);
+}
+
+.body-metric,
+.body-status {
+    font-family: var(--font-hud);
+    font-variant-numeric: tabular-nums;
+}
+
+.body-metric {
+    font-size: 1.25rem;
+}
+
+.body-status,
+.body-coming-soon {
+    color: var(--color-locked);
+}
+
+.body-coming-soon {
+    margin: 1.5rem 0 0;
+}
+
+.body-stack,
+.body-comms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.body-comms a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border: 1px solid var(--color-hud-dim);
+}
+
+.body-comms a:hover {
+    border-color: var(--color-hud);
+    background: var(--color-bg);
+}
+
+.body-comms svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.body-card {
+    display: block;
+    border: 1px solid var(--color-hud-dim);
+    color: var(--color-text);
+    font-family: var(--font-body);
+    text-decoration: none;
+}
+
+.body-card:hover,
+.body-card:focus-visible {
+    border-color: var(--color-hud);
+}
+
+.body-card:hover h3,
+.body-card:focus-visible h3 {
+    color: var(--color-hud);
+    text-decoration: underline;
+}
+
+.body-card img {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+}
+
+.body-card-content {
+    padding: 1rem;
+}
+
+.body-card h3 {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: 1.125rem;
+}
+
+.body-card .badge {
+    margin-bottom: 0.5rem;
+}
+
+.body-card p {
+    margin: 0.5rem 0 0;
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+}
