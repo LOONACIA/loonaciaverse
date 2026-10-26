@@ -7,7 +7,7 @@
     {
         <div class="scene-host" @ref="host"></div>
     }
-    <div class="hud-layer">
+    <div class="hud-layer" hidden="@(state == SceneState.Warping)">
         <header class="home-header">
             <h1>@Universe.Site.Title</h1>
             <p class="hud-label">SELECT DESTINATION</p>
@@ -20,7 +20,7 @@
             }
             @if (FocusedBody is { } focusedBody)
             {
-                <HudPanel Body="focusedBody" Stats="Universe.Stats" OnClose="CloseAsync" @ref="hudPanel" />
+                <HudPanel Body="focusedBody" Stats="Universe.Stats" OnClose="CloseAsync" OnTravel="TravelAsync" @ref="hudPanel" />
             }
         }
     </div>
@@ -66,9 +66,14 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
     {
+        if (state == SceneState.Warping)
+        {
+            return;
+        }
+
         _ = InvokeAsync(async () =>
         {
-            if (disposed || !IsHome)
+            if (disposed || !IsHome || state == SceneState.Warping)
             {
                 return;
             }
@@ -148,7 +153,27 @@
         }
     }
 
-    private Task HighlightAsync(string? id) => scene?.HighlightAsync(id) ?? Task.CompletedTask;
+    private async Task TravelAsync()
+    {
+        if (disposed || state != SceneState.Ready || scene is null || FocusedBody is not { Locked: false, Route: { } route } body)
+        {
+            return;
+        }
+
+        state = SceneState.Warping;
+        try
+        {
+            await scene.WarpAsync(body.Id);
+        }
+        catch (Exception)
+        {
+            // Even an unexpected animation failure must not block the destination.
+        }
+
+        Navigation.NavigateTo(route);
+    }
+
+    private Task HighlightAsync(string? id) => !disposed && state == SceneState.Ready && scene is not null ? scene.HighlightAsync(id) : Task.CompletedTask;
 
     private Task OnKeyDownAsync(KeyboardEventArgs args)
     {
@@ -224,6 +249,7 @@
     {
         Preparing,
         Ready,
+        Warping,
         Unavailable
     }
 }

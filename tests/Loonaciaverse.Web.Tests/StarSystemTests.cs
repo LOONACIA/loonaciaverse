@@ -581,19 +581,158 @@ public class StarSystemTests
         await scene.FocusAsync("blog", true);
         await scene.ClearFocusAsync();
         await scene.HighlightAsync("blog");
+        await scene.WarpAsync("blog");
         Assert.Empty(context.JSInterop.Invocations);
         Assert.False(await scene.InitAsync(default, TestContent.Universe()));
         await scene.FocusAsync("blog", false);
         await scene.ClearFocusAsync();
         await scene.HighlightAsync(null);
+        await scene.WarpAsync("blog");
         await scene.DisposeAsync();
         await scene.FocusAsync("blog", true);
         await scene.ClearFocusAsync();
         await scene.HighlightAsync("about");
+        await scene.WarpAsync("about");
 
         module.VerifyNotInvoke("focus");
         module.VerifyNotInvoke("clearFocus");
         module.VerifyNotInvoke("highlight");
+        module.VerifyNotInvoke("warp");
+    }
+
+    [Theory]
+    [InlineData("about", "/about")]
+    [InlineData("projects", "/projects")]
+    [InlineData("blog", "/blog")]
+    public async Task TravelHidesControlsAndWaitsForWarpBeforePushingTheDestination(string id, string route)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var warp = module.SetupVoid("warp", id);
+        var navigation = Navigation(context);
+        navigation.NavigateTo($"/?focus={id}");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        var travel = component.Find("button.hud-travel").ClickAsync(new MouseEventArgs());
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Equal(new object?[] { id }, Assert.Single(module.VerifyInvoke("warp", 1)).Arguments);
+            Assert.Equal($"/?focus={id}", Assert.Single(navigation.History).Uri);
+            Assert.Empty(component.FindComponents<HudPanel>());
+            Assert.Empty(component.FindAll(".hud-layer button"));
+        });
+        Assert.False(travel.IsCompleted);
+
+        warp.SetVoidResult();
+        await travel;
+
+        Assert.Equal(route, navigation.History.First().Uri);
+        Assert.Equal(2, navigation.History.Count);
+        Assert.False(navigation.History.First().Options.ReplaceHistoryEntry);
+    }
+
+    [Fact]
+    public async Task WarpingIgnoresSceneKeyboardStaleControlsAndLocationChanges()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var warp = module.SetupVoid("warp", "blog");
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+        var panel = component.FindComponent<HudPanel>().Instance;
+        var travel = component.Find("button.hud-travel").ClickAsync(new MouseEventArgs());
+        component.WaitForAssertion(() => module.VerifyInvoke("warp", 1));
+
+        await ClickBodyAsync(component, module, "projects");
+        await ClickBodyAsync(component, module, null);
+        foreach (var key in new[] { "Escape", "ArrowLeft", "ArrowRight", "Enter" })
+        {
+            component.Find(".star-system").KeyDown(new KeyboardEventArgs { Key = key });
+        }
+        await component.InvokeAsync(() => panel.OnClose.InvokeAsync());
+        await component.InvokeAsync(() => panel.OnTravel.InvokeAsync());
+
+        Assert.Equal("/?focus=blog", Assert.Single(navigation.History).Uri);
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=projects"));
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=unknown"));
+        component.Render();
+
+        Assert.Equal("/?focus=unknown", navigation.History.First().Uri);
+        Assert.Equal(3, navigation.History.Count);
+        Assert.Empty(component.FindComponents<HudPanel>());
+        Assert.Empty(component.FindAll(".hud-layer button"));
+        module.VerifyInvoke("focus", 1);
+        module.VerifyNotInvoke("clearFocus");
+        module.VerifyNotInvoke("highlight");
+        module.VerifyInvoke("warp", 1);
+        context.JSInterop.VerifyNotInvoke("history.back");
+        context.JSInterop.VerifyFocusAsyncInvoke(1);
+
+        warp.SetVoidResult();
+        await travel;
+
+        Assert.Equal("/blog", navigation.History.First().Uri);
+        Assert.False(navigation.History.First().Options.ReplaceHistoryEntry);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TravelStillPushesTheDestinationWhenWarpThrows(bool jsException)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        module.SetupVoid("warp", "blog").SetException<Exception>(jsException ? new JSException("Warp failed") : new InvalidOperationException("Unexpected warp failure"));
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        await component.Find("button.hud-travel").ClickAsync(new MouseEventArgs());
+
+        module.VerifyInvoke("warp", 1);
+        Assert.Equal("/blog", navigation.History.First().Uri);
+        Assert.False(navigation.History.First().Options.ReplaceHistoryEntry);
+        Assert.False(context.Renderer.UnhandledException.IsCompleted);
+    }
+
+    [Theory]
+    [InlineData(true, "/blog")]
+    [InlineData(true, null)]
+    [InlineData(false, null)]
+    public async Task LockedOrRoutelessBodiesCannotStartWarp(bool locked, string? route)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=playground");
+        var universe = TestContent.Universe();
+        universe = universe with { Bodies = universe.Bodies.Select(body => body.Id == "playground" ? body with { Locked = locked, Route = route } : body).ToArray() };
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, universe));
+
+        Assert.True(component.Find("button.hud-travel").HasAttribute("disabled"));
+        // Also enforce the guard for an already queued button callback.
+        await component.InvokeAsync(() => component.FindComponent<HudPanel>().Instance.OnTravel.InvokeAsync());
+
+        Assert.Equal("/?focus=playground", Assert.Single(navigation.History).Uri);
+        Assert.Equal("playground", component.FindComponent<HudPanel>().Instance.Body.Id);
+        Assert.Equal(4, component.FindAll(".hud-layer > button").Count);
+        module.VerifyNotInvoke("warp");
+    }
+
+    [Fact]
+    public async Task InteropWarpSwallowsJsExceptions()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        module.SetupVoid("warp", "blog").SetException(new JSException("Warp failed"));
+        await using var scene = new SceneInterop(context.JSInterop.JSRuntime);
+        Assert.True(await scene.InitAsync(default, TestContent.Universe()));
+
+        await scene.WarpAsync("blog");
+
+        Assert.Equal(new object?[] { "blog" }, Assert.Single(module.VerifyInvoke("warp", 1)).Arguments);
     }
 
     [Fact]
