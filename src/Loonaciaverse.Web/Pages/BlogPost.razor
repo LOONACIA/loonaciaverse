@@ -1,0 +1,39 @@
+@page "/blog/{Slug}"
+@layout PageLayout
+@inject IContentService ContentService
+
+<ContentLoader @key="Slug" TItem="PostDetail" Load="cancellationToken => ContentService.GetPostAsync(Slug, cancellationToken)" Context="post">
+    <PageTitle>@post.Meta.Title · LOONACIAVERSE</PageTitle>
+    <article class="blog-post">
+        <PageHeader BodyId="blog" Title="@post.Meta.Title">
+            <p class="post-meta">
+                PUBLISHED <time datetime="@Formatting.FormatDate(post.Meta.Date)">@Formatting.FormatDate(post.Meta.Date)</time>
+                @if (post.Meta.Updated is { } updated)
+                {
+                    <span> · UPDATED <time datetime="@Formatting.FormatDate(updated)">@Formatting.FormatDate(updated)</time></span>
+                }
+            </p>
+            @if (post.Meta.Draft)
+            {
+                <span class="badge badge-draft">DRAFT</span>
+            }
+            <ul class="post-tags" aria-label="태그">
+                @foreach (var tag in post.Meta.Tags)
+                {
+                    <li><a class="chip" href="/blog/tags/@Uri.EscapeDataString(tag)">@tag</a></li>
+                }
+            </ul>
+        </PageHeader>
+        @if (post.Meta.Cover is { } cover)
+        {
+            <img class="post-cover" src="@cover" alt="" />
+        }
+        <ContentBody Html="@post.Html" />
+        <a class="all-posts" href="/blog">← ALL POSTS</a>
+    </article>
+</ContentLoader>
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+}
