@@ -42,7 +42,8 @@ public class ContentBuildRunnerTests
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
         Assert.True(Directory.Exists(contentOutputDir));
-        Assert.Empty(Directory.EnumerateFileSystemEntries(contentOutputDir));
+        Assert.Equal(Path.Combine(contentOutputDir, "posts.json"), Assert.Single(Directory.EnumerateFileSystemEntries(contentOutputDir)));
+        Assert.Equal("[]", File.ReadAllText(Path.Combine(contentOutputDir, "posts.json")));
         Assert.Equal("keep html", File.ReadAllText(otherFile));
         Assert.Equal("keep css", File.ReadAllText(styleFile));
         Assert.Equal("source markdown", File.ReadAllText(sourceFile));
