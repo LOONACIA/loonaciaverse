@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 
+import "../../src/Loonaciaverse.Web/wwwroot/css/app.css";
 import { clearFocus, dispose, focus, highlight, init, warp } from "../src/scene/scene";
 import type { UniverseDto } from "../src/scene/types";
 

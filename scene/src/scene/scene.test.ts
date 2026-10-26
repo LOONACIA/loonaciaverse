@@ -151,7 +151,7 @@ describe("scene lifecycle", () => {
     init(container, universe, callbacks);
     expect(previous.dispose).toHaveBeenCalledOnce();
     expect(previous.forceContextLoss).toHaveBeenCalledOnce();
-    expect(container.children).toHaveLength(1);
+    expect(container.children).toHaveLength(2);
     const active = renderer();
     dispose();
     expect(disconnect).toHaveBeenCalledTimes(2);
@@ -300,7 +300,7 @@ describe("scene warp", () => {
     await expect(warp("planet")).resolves.toBeUndefined();
     init(container, universe, callbacks);
     await expect(warp("unknown")).resolves.toBeUndefined();
-    expect(container.children).toHaveLength(1);
+    expect(container.children).toHaveLength(2);
     dispose();
     await expect(warp("planet")).resolves.toBeUndefined();
     expect(vi.getTimerCount()).toBe(0);
@@ -395,7 +395,7 @@ describe("scene warp", () => {
     const releaseMaterial = vi.spyOn(streaks.material as import("three").LineBasicMaterial, "dispose");
     const pending = warp("planet");
     expect(container.style.position).toBe("relative");
-    expect(container.children).toHaveLength(2);
+    expect(container.children).toHaveLength(3);
     dispose();
     await expect(pending).resolves.toBeUndefined();
     expect(container.children).toHaveLength(0);
@@ -410,11 +410,87 @@ describe("scene warp", () => {
     const previous = warp("planet");
     init(container, universe, callbacks);
     await expect(previous).resolves.toBeUndefined();
-    expect(container.children).toHaveLength(1);
+    expect(container.children).toHaveLength(2);
     expect(vi.getTimerCount()).toBe(0);
     const next = warp("planet");
     expect(next).not.toBe(previous);
     await vi.advanceTimersByTimeAsync(WARP_DURATION_MS);
     await expect(next).resolves.toBeUndefined();
+  });
+});
+
+describe("scene decorations", () => {
+  it("creates a label layer above the canvas, resizes it and disposes its DOM and ring resources", () => {
+    const { scene } = startScene();
+    const layer = container.querySelector<HTMLElement>(".scene-label-layer")!;
+    const label = layer.querySelector<HTMLElement>(".scene-label")!;
+    expect(container.children[1]).toBe(layer);
+    expect(layer.style.pointerEvents).toBe("none");
+    expect(layer.style.zIndex).toBe("0");
+    expect(layer.style.width).toBe("1200px");
+    expect(label.textContent).toBe("PLANETTEST");
+    Object.defineProperty(container, "clientWidth", { value: 400 });
+    resize([], {} as ResizeObserver);
+    expect(layer.style.width).toBe("400px");
+    const ring = scene.children.find((child) => child instanceof Mesh && child.material.name === "focus-ring") as Mesh;
+    const geometryDispose = vi.spyOn(ring.geometry, "dispose");
+    const materialDispose = vi.spyOn(ring.material as import("three").Material, "dispose");
+    dispose();
+    expect(layer.isConnected).toBe(false);
+    expect(label.isConnected).toBe(false);
+    label.click();
+    expect(callbacks.invokeMethodAsync).not.toHaveBeenCalled();
+    expect(geometryDispose).toHaveBeenCalledOnce();
+    expect(materialDispose).toHaveBeenCalledOnce();
+  });
+
+  it("shares label clicks and hover with body input, and hides the focused label and warp decorations", async () => {
+    const { body, scene, camera, active } = startScene();
+    const label = container.querySelector<HTMLElement>(".scene-label")!;
+    const initial = body.position.clone();
+    const transform = label.style.transform;
+    label.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+    expect(label.classList.contains("is-emphasized")).toBe(true);
+    tick(1000);
+    expect(body.position.equals(initial)).toBe(true);
+    label.dispatchEvent(new PointerEvent("pointerleave"));
+    tick(2000);
+    expect(body.position.equals(initial)).toBe(false);
+    expect(label.style.transform).not.toBe(transform);
+    highlight("planet");
+    expect(label.classList.contains("is-emphasized")).toBe(true);
+    highlight(null);
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { ...bodyScreenPosition(camera, body), pointerType: "mouse" }));
+    expect(label.classList.contains("is-emphasized")).toBe(true);
+    label.click();
+    expect(callbacks.invokeMethodAsync).toHaveBeenLastCalledWith("OnBodyClicked", "planet");
+    focus("planet", true);
+    expect(label.style.display).toBe("none");
+    const ring = scene.children.find((child) => child instanceof Mesh && child.material.name === "focus-ring") as Mesh;
+    expect(ring.visible).toBe(true);
+    clearFocus();
+    expect(label.style.display).toBe("");
+    tick(2300);
+    expect(ring.visible).toBe(false);
+    focus("planet", true);
+    const pending = warp("planet");
+    expect(label.style.display).toBe("none");
+    expect(ring.visible).toBe(false);
+    vi.mocked(callbacks.invokeMethodAsync).mockClear();
+    label.click();
+    expect(callbacks.invokeMethodAsync).not.toHaveBeenCalled();
+    dispose();
+    await pending;
+  });
+
+  it.each(["", "#ffb347"])("reads the HUD color token with a fallback: %s", (token) => {
+    document.documentElement.style.setProperty("--color-hud", token);
+    try {
+      const { scene } = startScene();
+      const ring = scene.children.find((child) => child instanceof Mesh && child.material.name === "focus-ring") as Mesh<import("three").RingGeometry, import("three").ShaderMaterial>;
+      expect(ring.material.uniforms.uColor.value.getHexString()).toBe(token ? "ffb347" : "5fd4ff");
+    } finally {
+      document.documentElement.style.removeProperty("--color-hud");
+    }
   });
 });

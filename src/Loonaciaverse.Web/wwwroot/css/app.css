@@ -98,6 +98,42 @@ a {
     letter-spacing: 0.12em;
 }
 
+.scene-label {
+    padding: 0.35rem 0.65rem;
+    border-left: 1px solid var(--color-hud-dim);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: var(--font-hud);
+    line-height: 1.25;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.scene-label-name,
+.scene-label-subtitle {
+    display: block;
+}
+
+.scene-label-name {
+    font-size: clamp(0.9rem, 1.5vw, 1.1rem);
+    font-weight: 600;
+}
+
+.scene-label-subtitle {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    opacity: 0.75;
+}
+
+.scene-label.is-emphasized {
+    border-color: var(--color-hud);
+    color: var(--color-hud);
+    text-shadow: 0 0 0.75rem var(--color-hud-dim);
+}
+
 .hud-frame {
     position: relative;
     border: 1px solid var(--color-hud-dim);

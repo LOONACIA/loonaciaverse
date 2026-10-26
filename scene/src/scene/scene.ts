@@ -1,8 +1,11 @@
 import { PerspectiveCamera, Raycaster, Vector2, WebGLRenderer } from "three";
 import type { Quaternion, Vector3 } from "three";
+import { CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
 import { CameraTween, focusPose, overviewPose } from "./camera";
 import type { Pose } from "./camera";
+import { createBodyLabel } from "./labels";
 import { shouldPauseOrbits } from "./orbit";
+import { createFocusRing } from "./ring";
 import { createSystem } from "./system";
 import type { DotNetCallbacks, UniverseDto } from "./types";
 import { WARP_DURATION_MS, warpTimeline } from "./warp";
@@ -15,7 +18,6 @@ interface WarpState {
   startRotation: Quaternion;
   endRotation: Quaternion;
   overlay: HTMLDivElement;
-  originalContainerPosition: string | null;
   promise: Promise<void>;
   resolve: () => void;
   timerId: ReturnType<typeof setTimeout>;
@@ -24,6 +26,10 @@ interface WarpState {
 interface SceneState {
   container: HTMLElement;
   renderer: WebGLRenderer;
+  labelRenderer: CSS2DRenderer;
+  labels: ReturnType<typeof createBodyLabel>[];
+  ring: ReturnType<typeof createFocusRing>;
+  originalContainerPosition: string | null;
   system: ReturnType<typeof createSystem>;
   callbacks: DotNetCallbacks;
   camera: PerspectiveCamera;
@@ -51,24 +57,40 @@ function bodyPose(current: SceneState, bodyId: string): Pose | null {
   return body ? focusPose(body.position, body.geometry.parameters.radius, current.camera.aspect) : null;
 }
 
+function updateDecorations(current: SceneState, deltaSeconds = 0): void {
+  current.camera.updateMatrixWorld();
+  current.labels.forEach((label, index) => {
+    const body = current.system.bodies[index];
+    const emphasizedId = body.userData.bodyId === current.hoveredId ? current.hoveredId : current.highlightedId;
+    label.update(body, current.camera, current.focusedId, emphasizedId, current.warp !== null);
+  });
+  current.ring.update(deltaSeconds, current.camera, current.warp !== null);
+  current.labelRenderer.render(current.system.scene, current.camera);
+}
+
 export function focus(bodyId: string, immediate: boolean): void {
   if (!state || state.warp) return;
   const pose = bodyPose(state, bodyId);
   if (!pose) return;
   state.focusedId = bodyId;
+  state.ring.focus(state.system.bodies.find((mesh) => mesh.userData.bodyId === bodyId)!, immediate);
   state.tween.retarget(pose, immediate ? 0 : 0.8);
   applyPose(state.camera, state.tween.current);
+  updateDecorations(state);
 }
 
 export function clearFocus(): void {
   if (!state || state.warp) return;
   state.focusedId = null;
+  state.ring.focus(null);
   state.tween.retarget(overviewPose(state.system.radius, state.camera.aspect), 0.8);
+  updateDecorations(state);
 }
 
 export function highlight(bodyId: string | null): void {
   if (!state || state.warp) return;
   state.highlightedId = state.system.bodies.some((mesh) => mesh.userData.bodyId === bodyId) ? bodyId : null;
+  updateDecorations(state);
 }
 
 function updateWarp(current: SceneState, elapsedMs: number): void {
@@ -99,8 +121,6 @@ export function warp(bodyId: string): Promise<void> {
   const overlay = document.createElement("div");
   overlay.setAttribute("aria-hidden", "true");
   Object.assign(overlay.style, { position: "absolute", inset: "0", backgroundColor: "#05070d", opacity: "0", pointerEvents: "none" });
-  const originalContainerPosition = getComputedStyle(current.container).position === "static" ? current.container.style.position : null;
-  if (originalContainerPosition !== null) current.container.style.position = "relative";
   current.container.append(overlay);
   current.hoveredId = null;
   current.highlightedId = null;
@@ -110,13 +130,14 @@ export function warp(bodyId: string): Promise<void> {
   const promise = new Promise<void>((complete) => { resolve = complete; });
   current.warp = {
     startedAt: performance.now(), startPosition, direction, distance, startRotation, endRotation,
-    overlay, originalContainerPosition, promise, resolve,
+    overlay, promise, resolve,
     // Completion must not depend on rAF: hidden tabs suspend the render loop.
     timerId: setTimeout(() => {
       if (state === current) updateWarp(current, WARP_DURATION_MS);
       resolve();
     }, WARP_DURATION_MS),
   };
+  updateDecorations(current);
   return promise;
 }
 
@@ -148,6 +169,14 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   }
 
   const system = createSystem(universe);
+  const labelRenderer = new CSS2DRenderer();
+  labelRenderer.domElement.className = "scene-label-layer";
+  Object.assign(labelRenderer.domElement.style, { position: "absolute", inset: "0", pointerEvents: "none", zIndex: "0" });
+  const originalContainerPosition = getComputedStyle(container).position === "static" ? container.style.position : null;
+  if (originalContainerPosition !== null) container.style.position = "relative";
+  const hudColor = getComputedStyle(document.documentElement).getPropertyValue("--color-hud").trim() || "#5fd4ff";
+  const ring = createFocusRing(hudColor);
+  system.scene.add(ring.mesh);
   const camera = new PerspectiveCamera(45, 1, 0.1, 1000);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.domElement.style.display = "block";
@@ -156,6 +185,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     const width = Math.max(container.clientWidth, 1);
     const height = Math.max(container.clientHeight, 1);
     renderer.setSize(width, height);
+    labelRenderer.setSize(width, height);
     camera.aspect = width / height;
     const overview = overviewPose(system.radius, camera.aspect);
     if (!current.warp) {
@@ -165,6 +195,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     }
     camera.far = Math.max(1000, Math.hypot(overview.position.x, overview.position.y, overview.position.z) + system.radius * 16);
     camera.updateProjectionMatrix();
+    updateDecorations(current);
   };
 
   const frame = (timestamp: number) => {
@@ -176,6 +207,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     system.update(delta, current.warp !== null || shouldPauseOrbits(current.focusedId !== null, current.hoveredId !== null, current.highlightedId !== null));
     if (current.warp) updateWarp(current, performance.now() - current.warp.startedAt);
     else applyPose(camera, current.tween.step(delta));
+    updateDecorations(current, delta);
     renderer.render(system.scene, camera);
     current.frameId = requestAnimationFrame(frame);
   };
@@ -210,6 +242,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     if (current.warp) return;
     current.hoveredId = null;
     renderer.domElement.style.cursor = "";
+    updateDecorations(current);
   };
   const onPointerMove = (event: PointerEvent) => {
     if (current.warp) return;
@@ -219,7 +252,20 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     }
     current.hoveredId = pick(event);
     renderer.domElement.style.cursor = current.hoveredId === null ? "" : "pointer";
+    updateDecorations(current);
   };
+  const labels = universe.bodies.map((body) => {
+    const label = createBodyLabel(body, (id) => {
+      if (current.warp) return;
+      void callbacks.invokeMethodAsync("OnBodyClicked", id).catch(() => {});
+    }, (id) => {
+      if (current.warp) return;
+      current.hoveredId = id;
+      updateDecorations(current);
+    });
+    system.scene.add(label.object);
+    return label;
+  });
   const removePointerListeners = () => {
     renderer.domElement.removeEventListener("click", onClick);
     renderer.domElement.removeEventListener("pointermove", onPointerMove);
@@ -229,12 +275,12 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   const observer = new ResizeObserver(resize);
   const initialPose = overviewPose(system.radius, 1);
   const current: SceneState = {
-    container, renderer, system, callbacks, camera, tween: new CameraTween(initialPose, initialPose, 0),
+    container, renderer, labelRenderer, labels, ring, originalContainerPosition, system, callbacks, camera, tween: new CameraTween(initialPose, initialPose, 0),
     focusedId: null, hoveredId: null, highlightedId: null, removePointerListeners,
     observer, onVisibilityChange, frameId: null, lastTimestamp: null, warp: null,
   };
   state = current;
-  container.append(renderer.domElement);
+  container.append(renderer.domElement, labelRenderer.domElement);
   resize();
   observer.observe(container);
   document.addEventListener("visibilitychange", onVisibilityChange);
@@ -262,10 +308,13 @@ export function dispose(): void {
     clearTimeout(current.warp.timerId);
     current.warp.resolve();
     current.warp.overlay.remove();
-    if (current.warp.originalContainerPosition !== null) current.container.style.position = current.warp.originalContainerPosition;
   }
+  current.labels.forEach((label) => label.dispose());
+  current.labelRenderer.domElement.remove();
+  current.ring.dispose();
   current.system.dispose();
   current.renderer.dispose();
   current.renderer.forceContextLoss();
   current.renderer.domElement.remove();
+  if (current.originalContainerPosition !== null) current.container.style.position = current.originalContainerPosition;
 }
