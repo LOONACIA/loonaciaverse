@@ -6,7 +6,7 @@ public static class ContentBuildRunner
     {
         if (!Directory.Exists(options.ContentDir))
         {
-            return new BuildResult([$"{options.ContentDir}: Content directory does not exist."]);
+            return new BuildResult([$"{options.ContentDir}: Content directory does not exist.", .. SeoBuilder.ClearOutput(options.OutputDir)]);
         }
 
         string? contentOutputDir = null;
@@ -24,6 +24,10 @@ public static class ContentBuildRunner
             errors.AddRange(ProjectBuilder.Build(options.ContentDir, contentOutputDir, options.IncludeDrafts).Errors);
             errors.AddRange(AboutBuilder.Build(options.ContentDir, contentOutputDir).Errors);
             errors.AddRange(UniverseBuilder.Build(options.ContentDir, contentOutputDir, generateOutput: errors.Count == 0).Errors);
+            if (errors.Count == 0)
+            {
+                SeoBuilder.Build(options.OutputDir);
+            }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
@@ -45,6 +49,11 @@ public static class ContentBuildRunner
             {
                 errors.Add($"{contentOutputDir}: Could not clear failed build output: {exception.Message}");
             }
+        }
+
+        if (errors.Count > 0)
+        {
+            errors.AddRange(SeoBuilder.ClearOutput(options.OutputDir));
         }
 
         return new BuildResult(errors);
