@@ -1,0 +1,11 @@
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+node_modules/
+src/Loonaciaverse.Web/wwwroot/content/
+src/Loonaciaverse.Web/wwwroot/js/
+src/Loonaciaverse.Web/wwwroot/feed.xml
+src/Loonaciaverse.Web/wwwroot/sitemap.xml
+src/Loonaciaverse.Web/wwwroot/robots.txt

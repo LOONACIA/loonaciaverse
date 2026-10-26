@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Loonaciaverse.Web/Loonaciaverse.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Loonaciaverse.Web.Tests/Loonaciaverse.Web.Tests.csproj" />
+  </Folder>
+</Solution>
