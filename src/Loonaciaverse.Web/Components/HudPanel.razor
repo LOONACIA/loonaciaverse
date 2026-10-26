@@ -1,0 +1,15 @@
+<section class="hud-panel hud-frame" aria-label="@($"{Body.Name} — {Body.Subtitle}")">
+    <button class="hud-close" type="button" aria-label="CLOSE" @onclick="OnClose">✕</button>
+    <BodyInfo Body="Body" Stats="Stats" />
+</section>
+
+@code {
+    [Parameter, EditorRequired]
+    public CelestialBody Body { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public HudStats Stats { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+}

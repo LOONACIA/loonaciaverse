@@ -1,6 +1,9 @@
 using Bunit;
+using Bunit.TestDoubles;
 using Loonaciaverse.Web.Components;
 using Loonaciaverse.Web.Services;
+using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 
 namespace Loonaciaverse.Web.Tests;
@@ -220,6 +223,388 @@ public class StarSystemTests
         Assert.False(await scene.InitAsync(default, TestContent.Universe()));
         Assert.Empty(context.JSInterop.Invocations);
     }
+
+    [Fact]
+    public async Task SelectionPushesThenReplacesWithTheSameMarkerAndIgnoresTheSameBody()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+        Assert.Empty(component.FindComponents<HudPanel>());
+
+        await ClickBodyAsync(component, module, "blog");
+
+        var pushed = Assert.Single(navigation.History);
+        Assert.Equal("/?focus=blog", pushed.Uri);
+        Assert.False(pushed.Options.ReplaceHistoryEntry);
+        var marker = pushed.Options.HistoryEntryState;
+        Assert.False(string.IsNullOrEmpty(marker));
+        Assert.Equal(marker, navigation.HistoryEntryState);
+        Assert.Equal("blog", component.FindComponent<HudPanel>().Instance.Body.Id);
+        var focused = Assert.Single(module.VerifyInvoke("focus", 1));
+        Assert.Equal(new object?[] { "blog", false }, focused.Arguments);
+
+        await ClickBodyAsync(component, module, "projects");
+
+        var replaced = navigation.History.First();
+        Assert.Equal("/?focus=projects", replaced.Uri);
+        Assert.True(replaced.Options.ReplaceHistoryEntry);
+        Assert.Equal(marker, replaced.Options.HistoryEntryState);
+        Assert.Equal("projects", component.FindComponent<BodyInfo>().Instance.Body.Id);
+        var historyCount = navigation.History.Count;
+
+        await ClickBodyAsync(component, module, "projects");
+
+        Assert.Equal(historyCount, navigation.History.Count);
+        module.VerifyInvoke("focus", 2);
+        module.VerifyNotInvoke("clearFocus");
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("external-entry")]
+    public async Task SwitchingFromADirectFocusPreservesTheExistingHistoryState(string? entryState)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog", new NavigationOptions { HistoryEntryState = entryState });
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        await ClickBodyAsync(component, module, "about");
+
+        Assert.Equal("/?focus=about", navigation.History.First().Uri);
+        Assert.True(navigation.History.First().Options.ReplaceHistoryEntry);
+        Assert.Equal(entryState, navigation.History.First().Options.HistoryEntryState);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClosingAPushedFocusUsesHistoryBackAndWaitsForTheUrl(bool closeButton)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        context.JSInterop.SetupVoid("history.back").SetVoidResult();
+        var navigation = Navigation(context);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+        await ClickBodyAsync(component, module, "blog");
+        var historyCount = navigation.History.Count;
+
+        if (closeButton)
+        {
+            component.Find("button[aria-label='CLOSE']").Click();
+        }
+        else
+        {
+            await ClickBodyAsync(component, module, null);
+        }
+
+        context.JSInterop.VerifyInvoke("history.back", 1);
+        Assert.Equal(historyCount, navigation.History.Count);
+        Assert.Equal("blog", component.FindComponent<HudPanel>().Instance.Body.Id);
+        module.VerifyNotInvoke("clearFocus");
+
+        // bUnit records history.back but the browser's resulting LocationChanged must be simulated.
+        await component.InvokeAsync(() => navigation.NavigateTo("/"));
+
+        Assert.Empty(component.FindComponents<HudPanel>());
+        module.VerifyInvoke("clearFocus", 1);
+    }
+
+    [Fact]
+    public async Task RecreatedComponentRecognizesTheMarkerStoredInTheHistoryEntry()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        context.JSInterop.SetupVoid("history.back").SetVoidResult();
+        var navigation = Navigation(context);
+        var original = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+        await ClickBodyAsync(original, module, "blog");
+        var marker = navigation.HistoryEntryState;
+        await context.DisposeComponentsAsync();
+        navigation.NavigateTo("/blog");
+        navigation.NavigateTo("/?focus=blog", new NavigationOptions { HistoryEntryState = marker });
+
+        var recreated = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+        recreated.Find("button[aria-label='CLOSE']").Click();
+
+        context.JSInterop.VerifyInvoke("history.back", 1);
+        Assert.Equal(new object?[] { "blog", true }, module.VerifyInvoke("focus", 2).Last().Arguments);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClosingADirectFocusReplacesTheUrlWithOverview(bool closeButton)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        if (closeButton)
+        {
+            component.Find("button[aria-label='CLOSE']").Click();
+        }
+        else
+        {
+            await ClickBodyAsync(component, module, null);
+        }
+
+        Assert.Equal("/", navigation.History.First().Uri);
+        Assert.True(navigation.History.First().Options.ReplaceHistoryEntry);
+        Assert.Empty(component.FindComponents<HudPanel>());
+        module.VerifyInvoke("clearFocus", 1);
+        context.JSInterop.VerifyNotInvoke("history.back");
+    }
+
+    [Theory]
+    [InlineData("unknown", true)]
+    [InlineData("", true)]
+    [InlineData("BLOG", true)]
+    [InlineData("blog&focus=about", true)]
+    [InlineData("unknown", false)]
+    public void InvalidFocusIsReplacedWithOverviewEvenWhenTheSceneIsUnavailable(string focus, bool ready)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context, ready);
+        var navigation = Navigation(context);
+        navigation.NavigateTo($"/?focus={focus}");
+
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        Assert.Equal("/", navigation.History.First().Uri);
+        Assert.True(navigation.History.First().Options.ReplaceHistoryEntry);
+        Assert.Empty(component.FindComponents<HudPanel>());
+        module.VerifyNotInvoke("focus");
+    }
+
+    [Theory]
+    [InlineData("about")]
+    [InlineData("projects")]
+    [InlineData("blog")]
+    [InlineData("playground")]
+    [InlineData("%62log")]
+    public void DirectFocusIsAppliedImmediatelyAfterInitAndRendersTheBodyInfo(string focus)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        navigation.NavigateTo($"/?focus={focus}#details");
+        var universe = TestContent.Universe();
+        var id = Uri.UnescapeDataString(focus);
+
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, universe));
+
+        var invocation = Assert.Single(module.VerifyInvoke("focus", 1));
+        Assert.Equal(new object?[] { id, true }, invocation.Arguments);
+        Assert.Equal(new[] { "init", "focus" }, module.Invocations.Select(call => call.Identifier));
+        var panel = component.FindComponent<HudPanel>();
+        var body = universe.Bodies.Single(body => body.Id == id);
+        Assert.Same(body, panel.Instance.Body);
+        Assert.Same(universe.Stats, panel.Instance.Stats);
+        Assert.Equal(body.Name, panel.Find("h2").TextContent);
+        Assert.Equal(body.Tagline, panel.Find(".body-tagline").TextContent);
+        Assert.Single(navigation.History);
+        module.VerifyNotInvoke("clearFocus");
+    }
+
+    [Fact]
+    public async Task UrlChangesAnimateFocusAndClearItWithoutApplyingTheSameStateTwice()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=projects"));
+
+        Assert.Equal(new object?[] { "projects", false }, module.VerifyInvoke("focus", 2).Last().Arguments);
+        Assert.Equal("projects", component.FindComponent<HudPanel>().Instance.Body.Id);
+
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=projects&view=detail#same-body"));
+        component.Render();
+        module.VerifyInvoke("focus", 2);
+
+        await component.InvokeAsync(() => navigation.NavigateTo("/"));
+        await component.InvokeAsync(() => navigation.NavigateTo("/#overview"));
+
+        module.VerifyInvoke("clearFocus", 1);
+        Assert.Empty(component.FindComponents<HudPanel>());
+
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=about"));
+
+        Assert.Equal(new object?[] { "about", false }, module.VerifyInvoke("focus", 3).Last().Arguments);
+    }
+
+    [Fact]
+    public async Task UrlChangesDuringInitApplyOnlyTheLatestFocusImmediately()
+    {
+        using var context = new BunitContext();
+        var module = context.JSInterop.SetupModule("./js/scene.js");
+        var init = module.Setup<bool>("init", _ => true);
+        module.SetupVoid("dispose").SetVoidResult();
+        module.SetupVoid("focus", _ => true).SetVoidResult();
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=projects"));
+
+        Assert.Empty(component.FindComponents<HudPanel>());
+        module.VerifyNotInvoke("focus");
+        init.SetResult(true);
+
+        component.WaitForAssertion(() =>
+        {
+            Assert.Equal(new object?[] { "projects", true }, Assert.Single(module.VerifyInvoke("focus", 1)).Arguments);
+            Assert.Equal("projects", component.FindComponent<HudPanel>().Instance.Body.Id);
+        });
+    }
+
+    [Fact]
+    public async Task EmptySpaceInOverviewDoesNotNavigateOrCallTheScene()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        await ClickBodyAsync(component, module, null);
+
+        Assert.Empty(Navigation(context).History);
+        context.JSInterop.VerifyNotInvoke("history.back");
+        module.VerifyNotInvoke("focus");
+        module.VerifyNotInvoke("clearFocus");
+    }
+
+    [Fact]
+    public async Task UnavailableSceneKeepsTheListWithoutFocusCommandsOrHud()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context, false);
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=about"));
+        await ClickBodyAsync(component, module, "projects");
+        await ClickBodyAsync(component, module, null);
+
+        Assert.EndsWith("/?focus=about", navigation.Uri);
+        Assert.Empty(component.FindComponents<HudPanel>());
+        Assert.Single(component.FindComponents<ListHome>());
+        module.VerifyNotInvoke("focus");
+        module.VerifyNotInvoke("clearFocus");
+
+        await component.InvokeAsync(() => navigation.NavigateTo("/?focus=unknown"));
+
+        Assert.Equal("/", navigation.History.First().Uri);
+        Assert.True(navigation.History.First().Options.ReplaceHistoryEntry);
+    }
+
+    [Theory]
+    [InlineData("/blog?focus=about")]
+    [InlineData("/projects?focus=unknown")]
+    [InlineData("/about")]
+    public async Task LeavingHomeDoesNotApplyOrNormalizeFocus(string path)
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        await component.InvokeAsync(() => navigation.NavigateTo(path));
+
+        Assert.Equal(path, navigation.History.First().Uri);
+        Assert.Equal(2, navigation.History.Count);
+        module.VerifyInvoke("focus", 1);
+        module.VerifyNotInvoke("clearFocus");
+    }
+
+    [Fact]
+    public async Task SceneFocusErrorsDoNotPreventHudUpdatesOrNavigation()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        module.SetupVoid("focus", _ => true).SetException(new JSException("Focus failed"));
+        module.SetupVoid("clearFocus").SetException(new JSException("Clear failed"));
+        var navigation = Navigation(context);
+        navigation.NavigateTo("/?focus=blog");
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+
+        Assert.Equal("blog", component.FindComponent<HudPanel>().Instance.Body.Id);
+        await ClickBodyAsync(component, module, "projects");
+        Assert.Equal("projects", component.FindComponent<HudPanel>().Instance.Body.Id);
+        component.Find("button[aria-label='CLOSE']").Click();
+
+        Assert.Equal("/", navigation.History.First().Uri);
+        Assert.Empty(component.FindComponents<HudPanel>());
+        module.VerifyInvoke("clearFocus", 1);
+        Assert.False(context.Renderer.UnhandledException.IsCompleted);
+    }
+
+    [Fact]
+    public async Task DisposedComponentNoLongerHandlesNavigationOrSceneCallbacks()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context);
+        var navigation = Navigation(context);
+        var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
+        var scene = CallbackReference(module).Value;
+        await context.DisposeComponentsAsync();
+
+        navigation.NavigateTo("/?focus=unknown");
+        await scene.OnBodyClicked("blog");
+
+        Assert.Equal("/?focus=unknown", Assert.Single(navigation.History).Uri);
+        module.VerifyNotInvoke("focus");
+        module.VerifyNotInvoke("clearFocus");
+        Assert.False(context.Renderer.UnhandledException.IsCompleted);
+    }
+
+    [Fact]
+    public async Task InteropFocusCommandsAreNoOpsBeforeInitializationAfterFailureAndAfterDisposal()
+    {
+        using var context = new BunitContext();
+        var module = SetupScene(context, false);
+        var scene = new SceneInterop(context.JSInterop.JSRuntime);
+
+        await scene.FocusAsync("blog", true);
+        await scene.ClearFocusAsync();
+        Assert.Empty(context.JSInterop.Invocations);
+        Assert.False(await scene.InitAsync(default, TestContent.Universe()));
+        await scene.FocusAsync("blog", false);
+        await scene.ClearFocusAsync();
+        await scene.DisposeAsync();
+        await scene.FocusAsync("blog", true);
+        await scene.ClearFocusAsync();
+
+        module.VerifyNotInvoke("focus");
+        module.VerifyNotInvoke("clearFocus");
+    }
+
+    private static BunitJSModuleInterop SetupScene(BunitContext context, bool ready = true)
+    {
+        var module = context.JSInterop.SetupModule("./js/scene.js");
+        module.Setup<bool>("init", _ => true).SetResult(ready);
+        module.SetupVoid("focus", _ => true).SetVoidResult();
+        module.SetupVoid("clearFocus").SetVoidResult();
+        module.SetupVoid("dispose").SetVoidResult();
+        return module;
+    }
+
+    private static BunitNavigationManager Navigation(BunitContext context) => Assert.IsType<BunitNavigationManager>(context.Services.GetRequiredService<NavigationManager>());
+
+    private static DotNetObjectReference<SceneInterop> CallbackReference(BunitJSModuleInterop module) =>
+        Assert.IsType<DotNetObjectReference<SceneInterop>>(module.VerifyInvoke("init", 1).Single().Arguments[2]);
+
+    private static Task ClickBodyAsync(IRenderedComponent<StarSystem> component, BunitJSModuleInterop module, string? id) =>
+        component.InvokeAsync(() => CallbackReference(module).Value.OnBodyClicked(id));
 
     private sealed class PendingImportRuntime : IJSRuntime
     {

@@ -1,5 +1,6 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <div class="star-system @(state == SceneState.Unavailable ? "list-fallback" : "")">
     @if (state != SceneState.Unavailable)
@@ -11,6 +12,10 @@
             <h1>@Universe.Site.Title</h1>
             <p class="hud-label">SELECT DESTINATION</p>
         </header>
+        @if (state == SceneState.Ready && FocusedBody is { } body)
+        {
+            <HudPanel Body="body" Stats="Universe.Stats" OnClose="CloseAsync" />
+        }
     </div>
     @if (state == SceneState.Unavailable)
     {
@@ -22,10 +27,116 @@
     [Parameter, EditorRequired]
     public Universe Universe { get; set; } = default!;
 
+    private const string FocusHistoryMarker = "loonaciaverse:home-focus";
     private ElementReference host;
     private Services.SceneInterop? scene;
     private SceneState state = SceneState.Preparing;
     private bool disposed;
+    // These track scene commands only; the selected body is always read from the URL.
+    private bool hasAppliedFocus;
+    private string? appliedFocusId;
+
+    private bool IsHome => Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Length == 0;
+    private string? FocusId => System.Web.HttpUtility.ParseQueryString(new Uri(Navigation.Uri).Query)["focus"];
+    private CelestialBody? FocusedBody => IsHome ? Universe.Bodies.FirstOrDefault(body => body.Id == FocusId) : null;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        NormalizeFocusUrl();
+    }
+
+    private void NormalizeFocusUrl()
+    {
+        if (IsHome && FocusId is not null && FocusedBody is null)
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        _ = InvokeAsync(async () =>
+        {
+            if (disposed || !IsHome)
+            {
+                return;
+            }
+
+            NormalizeFocusUrl();
+            StateHasChanged();
+            await ApplyFocusAsync();
+        });
+    }
+
+    private async Task ApplyFocusAsync()
+    {
+        if (disposed || !IsHome || state != SceneState.Ready || scene is null)
+        {
+            return;
+        }
+
+        var id = FocusedBody?.Id;
+        if (hasAppliedFocus && appliedFocusId == id)
+        {
+            return;
+        }
+
+        var immediate = !hasAppliedFocus;
+        hasAppliedFocus = true;
+        appliedFocusId = id;
+        if (id is not null)
+        {
+            await scene.FocusAsync(id, immediate);
+        }
+        else if (!immediate)
+        {
+            await scene.ClearFocusAsync();
+        }
+    }
+
+    private Task OnBodyClickedAsync(string? id) => InvokeAsync(async () =>
+    {
+        if (disposed || !IsHome || state != SceneState.Ready)
+        {
+            return;
+        }
+
+        if (id is null)
+        {
+            await CloseAsync();
+            return;
+        }
+
+        if (!Universe.Bodies.Any(body => body.Id == id) || FocusedBody?.Id == id)
+        {
+            return;
+        }
+
+        var replacing = FocusedBody is not null;
+        Navigation.NavigateTo($"/?focus={Uri.EscapeDataString(id)}", new NavigationOptions
+        {
+            ReplaceHistoryEntry = replacing,
+            HistoryEntryState = replacing ? Navigation.HistoryEntryState : FocusHistoryMarker
+        });
+    });
+
+    private async Task CloseAsync()
+    {
+        if (disposed || state != SceneState.Ready || FocusedBody is null)
+        {
+            return;
+        }
+
+        if (Navigation.HistoryEntryState == FocusHistoryMarker)
+        {
+            await JS.InvokeVoidAsync("history.back");
+        }
+        else
+        {
+            Navigation.NavigateTo("/", replace: true);
+        }
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -35,19 +146,23 @@
         }
 
         scene = new Services.SceneInterop(JS);
+        scene.BodyClicked += OnBodyClickedAsync;
         var ready = await scene.InitAsync(host, Universe);
         if (!disposed)
         {
             state = ready ? SceneState.Ready : SceneState.Unavailable;
             StateHasChanged();
+            await ApplyFocusAsync();
         }
     }
 
     public async ValueTask DisposeAsync()
     {
         disposed = true;
+        Navigation.LocationChanged -= OnLocationChanged;
         if (scene is not null)
         {
+            scene.BodyClicked -= OnBodyClickedAsync;
             await scene.DisposeAsync();
         }
     }

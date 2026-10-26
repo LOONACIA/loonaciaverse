@@ -11,6 +11,12 @@ public sealed class SceneInterop(IJSRuntime js) : IAsyncDisposable
     private DotNetObjectReference<SceneInterop>? callbacks;
     private Task? disposeTask;
     private bool disposed;
+    private bool initialized;
+
+    public event Func<string?, Task>? BodyClicked;
+
+    [JSInvokable]
+    public Task OnBodyClicked(string? id) => BodyClicked is { } handlers ? Task.WhenAll(handlers.GetInvocationList().Cast<Func<string?, Task>>().Select(handler => handler(id))) : Task.CompletedTask;
 
     public async Task<bool> InitAsync(ElementReference container, Universe universe)
     {
@@ -29,13 +35,46 @@ public sealed class SceneInterop(IJSRuntime js) : IAsyncDisposable
             }
 
             callbacks ??= DotNetObjectReference.Create(this);
-            var ready = await module.InvokeAsync<bool>("init", container, universe, callbacks);
-            return ready && !disposed;
+            initialized = await module.InvokeAsync<bool>("init", container, universe, callbacks) && !disposed;
+            return initialized;
         }
         catch (JSException)
         {
             // A missing module or unavailable renderer falls back to the list home.
+            initialized = false;
             return false;
+        }
+        finally
+        {
+            lifecycleLock.Release();
+        }
+    }
+
+    public Task FocusAsync(string bodyId, bool immediate) => InvokeSceneAsync("focus", bodyId, immediate);
+
+    public Task ClearFocusAsync() => InvokeSceneAsync("clearFocus");
+
+    private async Task InvokeSceneAsync(string identifier, params object?[] arguments)
+    {
+        if (disposed || !initialized)
+        {
+            return;
+        }
+
+        await lifecycleLock.WaitAsync();
+        try
+        {
+            if (disposed || !initialized || moduleTask is null)
+            {
+                return;
+            }
+
+            var module = await moduleTask;
+            await module.InvokeVoidAsync(identifier, arguments);
+        }
+        catch (JSException)
+        {
+            // Visual effects must not prevent HUD updates or navigation.
         }
         finally
         {
@@ -46,6 +85,7 @@ public sealed class SceneInterop(IJSRuntime js) : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         disposed = true;
+        initialized = false;
         return new ValueTask(disposeTask ??= DisposeCoreAsync());
     }
 

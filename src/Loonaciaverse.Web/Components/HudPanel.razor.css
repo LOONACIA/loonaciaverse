@@ -1,0 +1,45 @@
+.hud-panel {
+    position: absolute;
+    top: 9rem;
+    bottom: 2rem;
+    left: 2rem;
+    width: min(24rem, 40vw);
+    height: fit-content;
+    max-height: calc(100dvh - 11rem);
+    padding: 3.5rem 1.5rem 1.5rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    pointer-events: auto;
+}
+
+.hud-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: grid;
+    width: 2.75rem;
+    height: 2.75rem;
+    place-items: center;
+    border: 1px solid var(--color-hud-dim);
+    background: var(--color-surface);
+    color: var(--color-hud);
+    font: inherit;
+    cursor: pointer;
+}
+
+.hud-close:hover {
+    border-color: var(--color-hud);
+    background: var(--color-bg);
+}
+
+@media (max-aspect-ratio: 1/1) {
+    .hud-panel {
+        top: auto;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        max-height: 45dvh;
+        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    }
+}
