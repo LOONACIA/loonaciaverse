@@ -9,6 +9,42 @@ namespace Loonaciaverse.Web.Tests;
 
 public class BlogPostTests
 {
+    [Fact]
+    public void RendersPostTocInBothVariantsAndScrollsToOriginalHeadingId()
+    {
+        using var context = new BunitContext();
+        var post = TestContent.Post() with { Toc = [new(2, "나만의-우주를-시작하며", "나만의 우주를 시작하며"), new(3, "세부-내용", "세부 내용")] };
+        ConfigureService(context, post);
+        context.Services.GetRequiredService<NavigationManager>().NavigateTo($"/blog/{post.Meta.Slug}");
+        var module = context.JSInterop.SetupModule("./js/toc.js");
+        module.SetupVoid("scrollToHeading", _ => true).SetVoidResult();
+
+        var component = context.Render<BlogPost>(parameters => parameters.Add(p => p.Slug, post.Meta.Slug));
+
+        Assert.Contains("has-toc", component.Find(".post-layout").ClassList);
+        foreach (var variant in component.FindAll(".toc"))
+        {
+            Assert.Equal(post.Toc.Select(entry => entry.Text), variant.QuerySelectorAll("a").Select(link => link.TextContent));
+            Assert.Equal(post.Toc.Select(entry => $"/blog/{post.Meta.Slug}#{Uri.EscapeDataString(entry.Id)}"), variant.QuerySelectorAll("a").Select(link => link.GetAttribute("href")));
+        }
+        component.Find(".toc-desktop a").Click();
+        Assert.Equal(post.Toc[0].Id, Assert.Single(Assert.Single(module.VerifyInvoke("scrollToHeading", 1)).Arguments));
+    }
+
+    [Fact]
+    public void PostWithoutTocRendersBodyWithoutContentsOrSidebarColumn()
+    {
+        using var context = new BunitContext();
+        var post = TestContent.Post() with { Toc = [] };
+        ConfigureService(context, post);
+
+        var component = context.Render<BlogPost>(parameters => parameters.Add(p => p.Slug, post.Meta.Slug));
+
+        Assert.Empty(component.FindAll(".toc"));
+        Assert.DoesNotContain("has-toc", component.Find(".post-layout").ClassList);
+        component.Find(".prose").MarkupMatches($"<div class=\"prose\">{post.Html}</div>");
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

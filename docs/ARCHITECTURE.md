@@ -22,13 +22,14 @@ loonaciaverse/
 │        ├─ staticwebapp.config.json
 │        ├─ css/  fonts/
 │        ├─ content/                 # [빌드 산출물] ContentBuilder 출력
-│        ├─ js/                      # [빌드 산출물] Vite 출력 (scene.js, highlight.js)
+│        ├─ js/                      # [빌드 산출물] Vite 출력 (scene.js, highlight.js, toc.js)
 │        └─ feed.xml, sitemap.xml, robots.txt   # [빌드 산출물]
 ├─ tools/
 │  └─ Loonaciaverse.ContentBuilder/  # 콘솔: content/ → wwwroot/content/ (Markdig, YamlDotNet)
 ├─ scene/                            # npm 프로젝트: TypeScript + Vite + Vitest
 │  ├─ src/scene/                     # Three.js 씬 (진입점 scene.ts)
 │  ├─ src/highlight.ts               # highlight.js 래퍼 (필요한 언어만 등록)
+│  ├─ src/toc.ts                     # 목차 클릭 스크롤
 │  └─ sandbox/                       # Blazor 없이 씬만 띄우는 Vite 개발 서버 페이지
 ├─ content/
 │  ├─ site.yml                       # 사이트 제목, baseUrl, 작성자

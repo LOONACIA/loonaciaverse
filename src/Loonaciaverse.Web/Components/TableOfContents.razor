@@ -1,0 +1,88 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+@if (Entries.Count > 0)
+{
+    <details class="toc toc-mobile">
+        <summary>CONTENTS</summary>
+        @Links
+    </details>
+    <nav class="toc toc-desktop" aria-label="CONTENTS">
+        <p class="toc-label">CONTENTS</p>
+        @Links
+    </nav>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TocEntry> Entries { get; set; } = [];
+
+    private Task<IJSObjectReference>? moduleTask;
+    private bool disposed;
+    private readonly SemaphoreSlim scrollLock = new(1, 1);
+
+    private RenderFragment Links => @<ul>
+        @foreach (var entry in Entries)
+        {
+            <li class="@(entry.Level == 3 ? "toc-level-3" : null)">
+                <a href="@GetHref(entry.Id)" @onclick="() => ScrollToHeadingAsync(entry.Id)" @onclick:preventDefault>@entry.Text</a>
+            </li>
+        }
+    </ul>;
+
+    private string GetHref(string id) => $"{new Uri(Navigation.Uri).AbsolutePath}#{Uri.EscapeDataString(id)}";
+
+    private async Task ScrollToHeadingAsync(string id)
+    {
+        await scrollLock.WaitAsync();
+        try
+        {
+            if (disposed)
+            {
+                return;
+            }
+
+            var module = await (moduleTask ??= JS.InvokeAsync<IJSObjectReference>("import", "./js/toc.js").AsTask());
+            if (!disposed)
+            {
+                await module.InvokeVoidAsync("scrollToHeading", id);
+            }
+        }
+        catch (JSException)
+        {
+            // A failed scroll leaves the contents and copyable links available.
+        }
+        finally
+        {
+            scrollLock.Release();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed)
+        {
+            return;
+        }
+
+        disposed = true;
+        await scrollLock.WaitAsync();
+        try
+        {
+            if (moduleTask is not null)
+            {
+                var module = await moduleTask;
+                await module.DisposeAsync();
+            }
+        }
+        catch (JSException)
+        {
+            // A failed import or disconnected runtime needs no further cleanup.
+        }
+        finally
+        {
+            scrollLock.Release();
+        }
+    }
+}
