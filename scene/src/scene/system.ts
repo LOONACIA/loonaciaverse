@@ -2,14 +2,14 @@ import { AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, LineBa
 import type { ShaderMaterial, Vector3 } from "three";
 import { createAtmosphereMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial, createStarMaterial } from "./materials";
 import { OrbitClock, orbitPosition } from "./orbit";
+import { DESKTOP_STAR_COUNT } from "./quality";
 import type { UniverseDto } from "./types";
 
-const STAR_COUNT = 3000;
 const STAR_RADIUS = 2;
 const PLANET_RADIUS = 0.9;
 const SPIN_RADIANS_PER_SECOND = 0.12;
 
-export function createSystem(universe: UniverseDto) {
+export function createSystem(universe: UniverseDto, starCount = DESKTOP_STAR_COUNT) {
   const scene = new Scene();
   scene.background = new Color("#05070d");
   const clock = new OrbitClock();
@@ -44,8 +44,8 @@ export function createSystem(universe: UniverseDto) {
   nebula.renderOrder = -1;
   scene.add(nebula);
   animatedMaterials.push(nebulaMaterial);
-  const positions = new Float32Array(STAR_COUNT * 3);
-  for (let index = 0; index < STAR_COUNT; index++) {
+  const positions = new Float32Array(starCount * 3);
+  for (let index = 0; index < starCount; index++) {
     const azimuth = Math.random() * Math.PI * 2;
     const y = Math.random() * 2 - 1;
     const horizontal = Math.sqrt(1 - y * y);
@@ -58,7 +58,7 @@ export function createSystem(universe: UniverseDto) {
   scene.add(new Points(starGeometry, starMaterial));
 
   // Each streak starts at an existing star and extends along the travel direction.
-  const streakPositions = new Float32BufferAttribute(new Float32Array(STAR_COUNT * 6), 3);
+  const streakPositions = new Float32BufferAttribute(new Float32Array(starCount * 6), 3);
   const streakGeometry = new BufferGeometry();
   streakGeometry.setAttribute("position", streakPositions);
   const streakMaterial = new LineBasicMaterial({ color: "#d5e5ff", transparent: true, opacity: 0, blending: AdditiveBlending, depthWrite: false });
@@ -77,7 +77,7 @@ export function createSystem(universe: UniverseDto) {
       starMaterial.opacity = 1 - amount;
       starMaterial.transparent = true;
       const length = radius * 6 * amount;
-      for (let index = 0; index < STAR_COUNT; index++) {
+      for (let index = 0; index < starCount; index++) {
         const offset = index * 3;
         const x = positions[offset], y = positions[offset + 1], z = positions[offset + 2];
         streakPositions.setXYZ(index * 2, x, y, z);

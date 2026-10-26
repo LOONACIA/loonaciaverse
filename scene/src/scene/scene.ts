@@ -1,10 +1,16 @@
 import { PerspectiveCamera, Raycaster, Vector2, WebGLRenderer } from "three";
 import type { Quaternion, Vector3 } from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { CSS2DRenderer } from "three/addons/renderers/CSS2DRenderer.js";
 import { CameraTween, focusPose, overviewPose } from "./camera";
 import type { Pose } from "./camera";
 import { createBodyLabel } from "./labels";
 import { shouldPauseOrbits } from "./orbit";
+import { getQuality, parallaxOffset } from "./quality";
+import type { RenderQuality } from "./quality";
 import { createFocusRing } from "./ring";
 import { createSystem } from "./system";
 import type { DotNetCallbacks, UniverseDto } from "./types";
@@ -26,6 +32,10 @@ interface WarpState {
 interface SceneState {
   container: HTMLElement;
   renderer: WebGLRenderer;
+  composer: EffectComposer | null;
+  quality: RenderQuality;
+  parallaxPointer: Vector2;
+  parallaxAngles: Vector2;
   labelRenderer: CSS2DRenderer;
   labels: ReturnType<typeof createBodyLabel>[];
   ring: ReturnType<typeof createFocusRing>;
@@ -52,6 +62,14 @@ function applyPose(camera: PerspectiveCamera, pose: Pose): void {
   camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
 }
 
+function applyRenderPose(current: SceneState, pose: Pose): void {
+  applyPose(current.camera, pose);
+  if (!current.quality.parallax || current.warp) return;
+  // Never feed the rendered rotation back into CameraTween.
+  current.camera.rotateX(current.parallaxAngles.x);
+  current.camera.rotateY(current.parallaxAngles.y);
+}
+
 function bodyPose(current: SceneState, bodyId: string): Pose | null {
   const body = current.system.bodies.find((mesh) => mesh.userData.bodyId === bodyId);
   return body ? focusPose(body.position, body.geometry.parameters.radius, current.camera.aspect) : null;
@@ -75,7 +93,7 @@ export function focus(bodyId: string, immediate: boolean): void {
   state.focusedId = bodyId;
   state.ring.focus(state.system.bodies.find((mesh) => mesh.userData.bodyId === bodyId)!, immediate);
   state.tween.retarget(pose, immediate ? 0 : 0.8);
-  applyPose(state.camera, state.tween.current);
+  applyRenderPose(state, state.tween.current);
   updateDecorations(state);
 }
 
@@ -109,6 +127,10 @@ export function warp(bodyId: string): Promise<void> {
   if (!body) return Promise.resolve();
   if (current.warp) return current.warp.promise;
 
+  // Start travel from the unmodified tween pose; parallax is disabled during warp.
+  applyPose(current.camera, current.tween.current);
+  current.parallaxAngles.set(0, 0);
+  current.parallaxPointer.set(0, 0);
   const startPosition = current.camera.position.clone();
   const direction = body.position.clone().sub(startPosition);
   const distance = direction.length();
@@ -168,7 +190,8 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     return false;
   }
 
-  const system = createSystem(universe);
+  const quality = getQuality({ devicePixelRatio: window.devicePixelRatio, coarsePointer: window.matchMedia("(pointer: coarse)").matches, viewportWidth: container.clientWidth });
+  const system = createSystem(universe, quality.starCount);
   const labelRenderer = new CSS2DRenderer();
   labelRenderer.domElement.className = "scene-label-layer";
   Object.assign(labelRenderer.domElement.style, { position: "absolute", inset: "0", pointerEvents: "none", zIndex: "0" });
@@ -178,20 +201,28 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   const ring = createFocusRing(hudColor);
   system.scene.add(ring.mesh);
   const camera = new PerspectiveCamera(45, 1, 0.1, 1000);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(quality.pixelRatio);
   renderer.domElement.style.display = "block";
+  const composer = quality.bloom ? new EffectComposer(renderer) : null;
+  if (composer) {
+    composer.addPass(new RenderPass(system.scene, camera));
+    // Include the faint atmosphere rims while keeping the dark nebula below threshold.
+    composer.addPass(new UnrealBloomPass(new Vector2(1, 1), 0.25, 0.35, 0.1));
+    composer.addPass(new OutputPass());
+  }
 
   const resize = () => {
     const width = Math.max(container.clientWidth, 1);
     const height = Math.max(container.clientHeight, 1);
     renderer.setSize(width, height);
+    composer?.setSize(width, height);
     labelRenderer.setSize(width, height);
     camera.aspect = width / height;
     const overview = overviewPose(system.radius, camera.aspect);
     if (!current.warp) {
       const pose = current.focusedId === null ? overview : bodyPose(current, current.focusedId)!;
       current.tween.retarget(pose, 0);
-      applyPose(camera, pose);
+      applyRenderPose(current, pose);
     }
     camera.far = Math.max(1000, Math.hypot(overview.position.x, overview.position.y, overview.position.z) + system.radius * 16);
     camera.updateProjectionMatrix();
@@ -206,9 +237,16 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     current.lastTimestamp = timestamp;
     system.update(delta, current.warp !== null || shouldPauseOrbits(current.focusedId !== null, current.hoveredId !== null, current.highlightedId !== null));
     if (current.warp) updateWarp(current, performance.now() - current.warp.startedAt);
-    else applyPose(camera, current.tween.step(delta));
+    else {
+      if (quality.parallax) {
+        const offset = parallaxOffset(current.parallaxPointer, 2);
+        current.parallaxAngles.lerp(new Vector2(offset.x, offset.y), 1 - Math.exp(-6 * Math.max(0, delta)));
+      }
+      applyRenderPose(current, current.tween.step(delta));
+    }
     updateDecorations(current, delta);
-    renderer.render(system.scene, camera);
+    if (composer) composer.render(delta);
+    else renderer.render(system.scene, camera);
     current.frameId = requestAnimationFrame(frame);
   };
 
@@ -240,6 +278,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   };
   const onPointerLeave = () => {
     if (current.warp) return;
+    current.parallaxPointer.set(0, 0);
     current.hoveredId = null;
     renderer.domElement.style.cursor = "";
     updateDecorations(current);
@@ -251,6 +290,8 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
       return;
     }
     current.hoveredId = pick(event);
+    if (event.pointerType === "mouse" && quality.parallax) current.parallaxPointer.copy(pointer);
+    else current.parallaxPointer.set(0, 0);
     renderer.domElement.style.cursor = current.hoveredId === null ? "" : "pointer";
     updateDecorations(current);
   };
@@ -275,7 +316,8 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   const observer = new ResizeObserver(resize);
   const initialPose = overviewPose(system.radius, 1);
   const current: SceneState = {
-    container, renderer, labelRenderer, labels, ring, originalContainerPosition, system, callbacks, camera, tween: new CameraTween(initialPose, initialPose, 0),
+    container, renderer, composer, quality, parallaxPointer: new Vector2(), parallaxAngles: new Vector2(),
+    labelRenderer, labels, ring, originalContainerPosition, system, callbacks, camera, tween: new CameraTween(initialPose, initialPose, 0),
     focusedId: null, hoveredId: null, highlightedId: null, removePointerListeners,
     observer, onVisibilityChange, frameId: null, lastTimestamp: null, warp: null,
   };
@@ -312,6 +354,8 @@ export function dispose(): void {
   current.labels.forEach((label) => label.dispose());
   current.labelRenderer.domElement.remove();
   current.ring.dispose();
+  current.composer?.passes.forEach((pass) => pass.dispose());
+  current.composer?.dispose();
   current.system.dispose();
   current.renderer.dispose();
   current.renderer.forceContextLoss();

@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LineSegments, Mesh, PerspectiveCamera, Scene, SphereGeometry, WebGLRenderer } from "three";
+import { LineSegments, Mesh, PerspectiveCamera, Points, Scene, SphereGeometry, WebGLRenderer } from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { focusPose, overviewPose } from "./camera";
 import { clearFocus, dispose, focus, highlight, init, warp } from "./scene";
 import type { DotNetCallbacks, UniverseDto } from "./types";
@@ -18,6 +22,22 @@ vi.mock("three", async (importOriginal) => {
     }),
   };
 });
+
+vi.mock("three/addons/postprocessing/EffectComposer.js", () => ({
+  EffectComposer: vi.fn(function (renderer: WebGLRenderer) {
+    const passes: import("three/addons/postprocessing/Pass.js").Pass[] = [];
+    return {
+      passes,
+      addPass: vi.fn((pass: import("three/addons/postprocessing/Pass.js").Pass) => passes.push(pass)),
+      setSize: vi.fn(),
+      render: vi.fn(() => {
+        const pass = passes[0] as RenderPass;
+        renderer.render(pass.scene, pass.camera);
+      }),
+      dispose: vi.fn(),
+    };
+  }),
+}));
 
 const universe: UniverseDto = {
   bodies: [{
@@ -179,6 +199,122 @@ function bodyScreenPosition(camera: PerspectiveCamera, body: Mesh) {
   const projected = body.position.clone().project(camera);
   return { clientX: 20 + (projected.x + 1) * 600, clientY: 30 + (1 - projected.y) * 400 };
 }
+
+describe("scene render quality", () => {
+  it("renders desktop frames through ordered bloom passes, resizes them and releases their resources", () => {
+    const { active, scene } = startScene();
+    const composer = vi.mocked(EffectComposer).mock.results.at(-1)!.value as EffectComposer;
+    expect(EffectComposer).toHaveBeenCalledExactlyOnceWith(active);
+    expect(composer.passes).toHaveLength(3);
+    expect(composer.passes[0]).toBeInstanceOf(RenderPass);
+    expect(composer.passes[1]).toBeInstanceOf(UnrealBloomPass);
+    expect(composer.passes[2]).toBeInstanceOf(OutputPass);
+    expect(composer.render).toHaveBeenCalledExactlyOnceWith(0);
+    expect(composer.setSize).toHaveBeenCalledWith(1200, 800);
+    expect((scene.children.find((child) => child instanceof Points) as Points).geometry.getAttribute("position").count).toBe(3000);
+    Object.defineProperty(container, "clientWidth", { value: 400 });
+    resize([], {} as ResizeObserver);
+    expect(composer.setSize).toHaveBeenLastCalledWith(400, 800);
+    // Resizing does not reselect the tier chosen at initialization.
+    expect(window.matchMedia).toHaveBeenCalledWith("(pointer: coarse)");
+    expect(EffectComposer).toHaveBeenCalledOnce();
+    const releases = composer.passes.map((pass) => vi.spyOn(pass, "dispose"));
+    const bloom = composer.passes[1] as UnrealBloomPass;
+    const releaseBloomTarget = vi.spyOn(bloom.renderTargetsHorizontal[0], "dispose");
+    const releaseOutput = vi.spyOn((composer.passes[2] as OutputPass).material, "dispose");
+    dispose();
+    releases.forEach((release) => expect(release).toHaveBeenCalledOnce());
+    expect(releaseBloomTarget).toHaveBeenCalledOnce();
+    expect(releaseOutput).toHaveBeenCalledOnce();
+    expect(composer.dispose).toHaveBeenCalledOnce();
+  });
+
+  it.each(["coarse", "narrow"])("uses direct rendering, fewer stars and no parallax on %s devices", (device) => {
+    vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
+    if (device === "coarse") {
+      vi.mocked(window.matchMedia).mockImplementation((query) => ({ matches: query === "(pointer: coarse)" }) as MediaQueryList);
+    } else Object.defineProperty(container, "clientWidth", { value: 400 });
+    const { active, scene, camera } = startScene();
+    expect(active.setPixelRatio).toHaveBeenCalledWith(1.5);
+    expect(EffectComposer).not.toHaveBeenCalled();
+    expect(active.render).toHaveBeenCalledOnce();
+    expect((scene.children.find((child) => child instanceof Points) as Points).geometry.getAttribute("position").count).toBe(1500);
+    const streaks = scene.children.find((child) => child instanceof LineSegments) as LineSegments;
+    expect(streaks.geometry.getAttribute("position").count).toBe(3000);
+    const rotation = camera.quaternion.clone();
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
+    tick(1000);
+    expect(camera.quaternion.equals(rotation)).toBe(true);
+    expect(container.querySelector(".scene-label")).not.toBeNull();
+  });
+});
+
+describe("scene parallax", () => {
+  it("smoothly offsets only the rendered rotation and returns to center on pointerleave", () => {
+    const { active, camera } = startScene();
+    const position = camera.position.clone();
+    const rotation = camera.quaternion.clone();
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
+    expect(camera.quaternion.equals(rotation)).toBe(true);
+    tick(16);
+    const firstAngle = camera.quaternion.angleTo(rotation);
+    expect(firstAngle).toBeGreaterThan(0);
+    expect(firstAngle).toBeLessThan(2 * Math.PI / 180);
+    tick(1000);
+    expect(camera.quaternion.angleTo(rotation)).toBeGreaterThan(firstAngle);
+    expect(camera.quaternion.angleTo(rotation)).toBeLessThanOrEqual(2 * Math.PI / 180 + 1e-9);
+    expect(camera.position.equals(position)).toBe(true);
+    active.domElement.dispatchEvent(new PointerEvent("pointerleave"));
+    tick(5000);
+    expect(camera.quaternion.angleTo(rotation)).toBeLessThan(1e-6);
+  });
+
+  it("keeps focus and interrupted tweens independent from the rendered parallax", () => {
+    const { active, camera, body } = startScene();
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
+    tick(100);
+    focus("planet", false);
+    tick(500);
+    clearFocus();
+    tick(1300);
+    expect(camera.position.toArray()).toEqual(Object.values(overviewPose(16.9, 1.5).position));
+    focus("planet", true);
+    const pose = focusPose(body.position, body.geometry.parameters.radius, 1.5);
+    const base = new PerspectiveCamera();
+    base.position.set(pose.position.x, pose.position.y, pose.position.z);
+    base.lookAt(pose.target.x, pose.target.y, pose.target.z);
+    expect(camera.position.equals(base.position)).toBe(true);
+    expect(camera.quaternion.angleTo(base.quaternion)).toBeGreaterThan(0);
+    tick(2300);
+    expect(camera.position.equals(base.position)).toBe(true);
+    expect(camera.quaternion.angleTo(base.quaternion)).toBeLessThanOrEqual(2 * Math.PI / 180 + 1e-9);
+  });
+
+  it.each(["pen", "touch"])("does not introduce parallax from %s input", (pointerType) => {
+    const { active, camera } = startScene();
+    const rotation = camera.quaternion.clone();
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType }));
+    tick(1000);
+    expect(camera.quaternion.equals(rotation)).toBe(true);
+  });
+
+  it("removes the parallax rotation before warp and ignores further pointer input", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+    const { active, camera } = startScene();
+    const rotation = camera.quaternion.clone();
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
+    tick(1000);
+    expect(camera.quaternion.angleTo(rotation)).toBeGreaterThan(0);
+    const pending = warp("planet");
+    expect(camera.quaternion.angleTo(rotation)).toBeLessThan(1e-6);
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 20, clientY: 830, pointerType: "mouse" }));
+    tick(1001);
+    expect(camera.quaternion.angleTo(rotation)).toBeLessThan(1e-6);
+    // Disposal also resolves travel, so this check does not wait on a wall-clock timer.
+    dispose();
+    await pending;
+  });
+});
 
 describe("scene focus and input", () => {
   it("applies immediate focus, reframes on resize, and tweens back to overview in 0.8 seconds", () => {
