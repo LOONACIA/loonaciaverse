@@ -1,0 +1,35 @@
+@inject NavigationManager Navigation
+
+@if (Universe is not null || !string.IsNullOrEmpty(Title))
+{
+    <PageTitle>@(Universe is { } data ? string.IsNullOrEmpty(Title) ? data.Site.Title : $"{Title} · {data.Site.Title}" : Title)</PageTitle>
+}
+
+@if (Universe is { } universe)
+{
+    <HeadContent>
+        <meta name="description" content="@(Description ?? universe.Site.Description)" />
+        @if (NoIndex)
+        {
+            <meta name="robots" content="noindex" />
+        }
+        else
+        {
+            <link rel="canonical" href="@(universe.Site.BaseUrl.TrimEnd('/') + Navigation.ToAbsoluteUri(Navigation.Uri).AbsolutePath)" />
+        }
+    </HeadContent>
+}
+
+@code {
+    [CascadingParameter]
+    public Universe? Universe { get; set; }
+
+    [Parameter]
+    public string? Title { get; set; }
+
+    [Parameter]
+    public string? Description { get; set; }
+
+    [Parameter]
+    public bool NoIndex { get; set; }
+}

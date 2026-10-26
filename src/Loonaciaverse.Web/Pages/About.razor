@@ -2,9 +2,8 @@
 @layout PageLayout
 @inject IContentService ContentService
 
-<PageTitle>ABOUT · LOONACIAVERSE</PageTitle>
-
 <ContentLoader TItem="AboutProfile" Load="async cancellationToken => await ContentService.GetAboutAsync(cancellationToken)" Context="profile">
+    <PageMeta Title="ABOUT" />
     <article class="about-page">
         <PageHeader BodyId="about" Title="@profile.Name" />
         <p class="about-title">@profile.Title</p>

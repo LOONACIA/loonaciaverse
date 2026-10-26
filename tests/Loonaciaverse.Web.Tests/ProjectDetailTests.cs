@@ -1,5 +1,6 @@
 using Bunit;
 using Loonaciaverse.Core.Content;
+using Loonaciaverse.Web.Components;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -90,7 +91,9 @@ public class ProjectDetailTests
 
         Assert.Equal("LOST IN SPACE", component.Find("h1").TextContent);
         Assert.Empty(component.FindAll("article.project-detail, .prose"));
-        Assert.Empty(component.FindComponents<PageTitle>());
+        var meta = Assert.Single(component.FindComponents<PageMeta>()).Instance;
+        Assert.Equal("LOST IN SPACE", meta.Title);
+        Assert.True(meta.NoIndex);
         Assert.Equal("missing", Assert.Single(service.ProjectCalls).Slug);
     }
 

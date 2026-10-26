@@ -2,9 +2,8 @@
 @layout PageLayout
 @inject IContentService ContentService
 
-<PageTitle>PROJECTS · LOONACIAVERSE</PageTitle>
-
 <ContentLoader TItem="IReadOnlyList<ProjectSummary>" Load="async cancellationToken => await ContentService.GetProjectsAsync(cancellationToken)" Context="projects">
+    <PageMeta Title="PROJECTS" />
     <section class="projects-page">
         <PageHeader BodyId="projects" Title="PROJECTS" />
         @if (projects.Count == 0)

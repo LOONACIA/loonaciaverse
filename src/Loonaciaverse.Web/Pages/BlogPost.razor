@@ -3,7 +3,7 @@
 @inject IContentService ContentService
 
 <ContentLoader @key="Slug" TItem="PostDetail" Load="cancellationToken => ContentService.GetPostAsync(Slug, cancellationToken)" Context="post">
-    <PageTitle>@post.Meta.Title · LOONACIAVERSE</PageTitle>
+    <PageMeta Title="@post.Meta.Title" Description="@post.Meta.Summary" />
     <div class="post-layout @(post.Toc.Count > 0 ? "has-toc" : null)">
         <article class="blog-post">
             <PageHeader BodyId="blog" Title="@post.Meta.Title">

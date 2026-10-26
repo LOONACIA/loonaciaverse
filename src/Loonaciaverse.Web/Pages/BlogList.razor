@@ -3,11 +3,10 @@
 @layout PageLayout
 @inject IContentService ContentService
 
-<PageTitle>@(Tag is null ? "BLOG · LOONACIAVERSE" : $"{Tag} · BLOG · LOONACIAVERSE")</PageTitle>
-
 <ContentLoader @key="Tag" TItem="IReadOnlyList<PostSummary>" Load="async cancellationToken => await ContentService.GetPostsAsync(cancellationToken)" Context="posts">
     @if (Tag is null)
     {
+        <PageMeta Title="BLOG" />
         var tags = posts.SelectMany(post => post.Tags.Distinct(StringComparer.Ordinal))
             .GroupBy(tag => tag, StringComparer.Ordinal)
             .OrderByDescending(group => group.Count())
@@ -39,6 +38,7 @@
         }
         else
         {
+            <PageMeta Title="@($"{Tag} · BLOG")" />
             <section class="blog-page">
                 <PageHeader BodyId="blog" Label="TAG" Title="@Tag" />
                 <a class="all-posts" href="/blog">전체 글</a>

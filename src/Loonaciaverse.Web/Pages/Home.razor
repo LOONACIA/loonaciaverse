@@ -1,5 +1,10 @@
 ﻿@page "/"
 
-<PageTitle>LOONACIAVERSE</PageTitle>
+@inject IContentService ContentService
 
-<h1>LOONACIAVERSE</h1>
+<ContentLoader TItem="Universe" Load="async cancellationToken => await ContentService.GetUniverseAsync(cancellationToken)" Context="universe">
+    <CascadingValue Value="universe">
+        <PageMeta />
+        <h1>@universe.Site.Title</h1>
+    </CascadingValue>
+</ContentLoader>

@@ -29,7 +29,7 @@ public class NotFoundTests
     {
         using var context = new BunitContext();
         context.JSInterop.Setup<string>("Blazor._internal.PageTitle.getAndRemoveExistingTitle").SetResult(string.Empty);
-        context.Services.AddSingleton<Loonaciaverse.Core.Content.IContentService>(new FakeContentService());
+        context.Services.AddSingleton<Loonaciaverse.Core.Content.IContentService>(new FakeContentService { GetUniverseAsyncHandler = _ => Task.FromResult(TestContent.Universe()) });
         context.Services.GetRequiredService<NavigationManager>().NavigateTo(path);
         var head = context.Render<HeadOutlet>();
 
@@ -39,5 +39,7 @@ public class NotFoundTests
         Assert.Equal("LOONACIAVERSE", component.Find("header a.logo").TextContent);
         Assert.Equal("/", component.Find("header a.logo").GetAttribute("href"));
         Assert.Equal("LOST IN SPACE · LOONACIAVERSE", head.Find("title").TextContent);
+        Assert.Equal("noindex", head.Find("meta[name='robots']").GetAttribute("content"));
+        Assert.Empty(head.FindAll("link[rel='canonical']"));
     }
 }

@@ -3,7 +3,7 @@
 @inject IContentService ContentService
 
 <ContentLoader @key="Slug" TItem="Loonaciaverse.Core.Content.ProjectDetail" Load="cancellationToken => ContentService.GetProjectAsync(Slug, cancellationToken)" Context="project">
-    <PageTitle>@project.Meta.Title · LOONACIAVERSE</PageTitle>
+    <PageMeta Title="@project.Meta.Title" Description="@project.Meta.Summary" />
     <article class="project-detail">
         @if (project.Meta.Thumbnail is { } thumbnail)
         {
