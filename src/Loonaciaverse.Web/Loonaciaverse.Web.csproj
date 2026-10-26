@@ -13,4 +13,47 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.13" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../tools/Loonaciaverse.ContentBuilder/Loonaciaverse.ContentBuilder.csproj"
+                      ReferenceOutputAssembly="false" OutputItemType="_ContentBuilderAssembly"
+                      SkipGetTargetFrameworkProperties="true"
+                      GlobalPropertiesToRemove="TargetFramework;RuntimeIdentifier;RuntimeIdentifiers;SelfContained" />
+    <_ContentSource Include="../../content/**/*" />
+    <Watch Include="../../content/**/*" />
+  </ItemGroup>
+
+  <Target Name="PrepareContentBuild" DependsOnTargets="ResolveProjectReferences">
+    <PropertyGroup>
+      <_ContentBuildStamp>$(IntermediateOutputPath)content-builder.stamp</_ContentBuildStamp>
+      <_ContentBuildInputs>$(BaseIntermediateOutputPath)content-builder.inputs</_ContentBuildInputs>
+      <_ContentDraftArgument Condition="'$(Configuration)' == 'Debug'">--include-drafts</_ContentDraftArgument>
+    </PropertyGroup>
+    <!-- The shared input list also invalidates the stamp on deletions and configuration changes. -->
+    <WriteLinesToFile File="$(_ContentBuildInputs)" Lines="$(Configuration);@(_ContentSource->'%(FullPath)')"
+                      Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup>
+      <_ExistingGeneratedContent Include="wwwroot\content\**\*;wwwroot\feed.xml;wwwroot\sitemap.xml;wwwroot\robots.txt" />
+      <_RequiredContentOutput Include="wwwroot/content/universe.json;wwwroot/content/posts.json;wwwroot/content/projects.json;wwwroot/content/about.json;wwwroot/feed.xml;wwwroot/sitemap.xml;wwwroot/robots.txt" />
+      <_MissingContentOutput Include="@(_RequiredContentOutput)" Condition="!Exists('%(Identity)')" />
+    </ItemGroup>
+    <Delete Files="$(_ContentBuildStamp)" Condition="'@(_MissingContentOutput)' != ''" />
+  </Target>
+
+  <Target Name="BuildSiteContent" DependsOnTargets="PrepareContentBuild"
+          Inputs="@(_ContentSource);@(_ContentBuilderAssembly);$(_ContentBuildInputs);$(MSBuildProjectFullPath)"
+          Outputs="$(_ContentBuildStamp)">
+    <Exec Command="dotnet &quot;@(_ContentBuilderAssembly)&quot; --content &quot;$(MSBuildProjectDirectory)/../../content&quot; --output &quot;$(MSBuildProjectDirectory)/wwwroot&quot; $(_ContentDraftArgument)" />
+    <Touch Files="$(_ContentBuildStamp)" AlwaysCreate="true" />
+  </Target>
+
+  <Target Name="IncludeGeneratedSiteContent" BeforeTargets="ResolveProjectStaticWebAssets" DependsOnTargets="BuildSiteContent"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <!-- Re-evaluate after generation so first builds include new assets and omit removed ones. -->
+    <ItemGroup>
+      <Content Remove="@(_ExistingGeneratedContent)" />
+      <Content Include="wwwroot\content\**\*;wwwroot\feed.xml;wwwroot\sitemap.xml;wwwroot\robots.txt" CopyToPublishDirectory="PreserveNewest" />
+      <FileWrites Include="$(_ContentBuildStamp);$(_ContentBuildInputs)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

@@ -20,6 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Loonaciaverse.Core\Loonaciaverse.Core.csproj" />
     <ProjectReference Include="..\..\src\Loonaciaverse.Web\Loonaciaverse.Web.csproj" />
   </ItemGroup>
 

@@ -96,7 +96,9 @@ dotnet build src/Loonaciaverse.Web
  └─ Blazor WASM 컴파일
 ```
 - ContentBuilder는 Web 프로젝트의 `ProjectReference`(`ReferenceOutputAssembly="false"`)로 먼저 빌드한 뒤, 빌드된 dll을 `Exec`로 실행한다. `dotnet run`을 쓰지 않는다. 이유: 같은 빌드 안에서 Core를 동시에 빌드하다 파일 잠금이 생긴다.
-- 두 타깃 모두 `Inputs`/`Outputs`로 증분 빌드한다. `scene/node_modules`가 없으면 `npm ci`를 먼저 실행한다.
+- `ProjectReference`의 `GlobalPropertiesToRemove`로 Web의 TargetFramework, RuntimeIdentifier와 SelfContained 설정을 제거하고, `SkipGetTargetFrameworkProperties`로 단일 프레임워크 빌드 도구의 프레임워크 협상을 생략한다. `OutputItemType`으로 실행할 DLL 경로를 받는다.
+- 두 타깃 모두 `Inputs`/`Outputs`로 증분 빌드한다. ContentBuilder 타깃은 `content/**`, ContentBuilder DLL, 입력 목록과 Web csproj를 `Inputs`, `$(IntermediateOutputPath)content-builder.stamp`를 `Outputs`로 사용한다. `$(BaseIntermediateOutputPath)content-builder.inputs`에 파일 목록과 Configuration을 기록해 파일 삭제와 Debug/Release 전환도 감지하며, 필수 산출물이 없으면 다시 생성한다. `scene/node_modules`가 없으면 `npm ci`를 먼저 실행한다.
+- 정적 웹 자산 수집 전에 생성 파일의 `Content` 항목을 갱신해 첫 빌드와 publish에도 포함한다. 변환 실패는 빌드를 실패시키며 오류는 빌드 출력에 표시된다.
 - Web csproj에 `content/**`와 `scene/src/**`를 `Watch` 항목으로 추가해 `dotnet watch`가 변경을 감지하게 한다.
 
 **런타임: 홈**
