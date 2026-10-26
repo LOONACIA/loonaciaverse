@@ -7,6 +7,19 @@ namespace Loonaciaverse.Web.Tests;
 
 public class StaticAssetTests
 {
+    [Fact]
+    public void IndexPreloadsTheGeneratedSceneModule()
+    {
+        var webRoot = ContentBuildIntegrationTests.FindWebRoot();
+        var html = File.ReadAllText(Path.Combine(webRoot, "index.html"));
+        var document = new HtmlParser().ParseDocument(html);
+        var link = Assert.Single(document.QuerySelectorAll("head link[rel='modulepreload']"));
+
+        Assert.Equal("js/scene#[.{fingerprint}].js", link.GetAttribute("href"));
+        var path = link.GetAttribute("href")!.Replace("#[.{fingerprint}]", "");
+        AssertFileInsideWebRoot(webRoot, Path.GetFullPath(Path.Combine(webRoot, path)));
+    }
+
     [Theory]
     [InlineData("css/app.css")]
     [InlineData("fonts/pretendard/pretendardvariable-dynamic-subset.css")]

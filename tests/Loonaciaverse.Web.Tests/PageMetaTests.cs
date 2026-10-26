@@ -234,6 +234,9 @@ public class PageMetaTests
     private static FakeContentService ConfigureContent(BunitContext context)
     {
         context.JSInterop.SetupModule("./js/highlight.js").SetupVoid("highlightAll", _ => true).SetVoidResult();
+        var scene = context.JSInterop.SetupModule("./js/scene.js");
+        scene.Setup<bool>("init", _ => true).SetResult(true);
+        scene.SetupVoid("dispose").SetVoidResult();
         var service = new FakeContentService
         {
             GetUniverseAsyncHandler = _ => Task.FromResult(Universe()),

@@ -5,12 +5,6 @@
 <ContentLoader TItem="Universe" Load="async cancellationToken => await ContentService.GetUniverseAsync(cancellationToken)" Context="universe">
     <CascadingValue Value="universe">
         <PageMeta />
-        <div class="home-page">
-            <header class="home-header">
-                <h1>@universe.Site.Title</h1>
-                <p class="hud-label">SELECT DESTINATION</p>
-            </header>
-            <ListHome Universe="universe" />
-        </div>
+        <StarSystem Universe="universe" />
     </CascadingValue>
 </ContentLoader>

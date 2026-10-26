@@ -1,0 +1,61 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="star-system @(state == SceneState.Unavailable ? "list-fallback" : "")">
+    @if (state != SceneState.Unavailable)
+    {
+        <div class="scene-host" @ref="host"></div>
+    }
+    <div class="hud-layer">
+        <header class="home-header">
+            <h1>@Universe.Site.Title</h1>
+            <p class="hud-label">SELECT DESTINATION</p>
+        </header>
+    </div>
+    @if (state == SceneState.Unavailable)
+    {
+        <ListHome Universe="Universe" />
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Universe Universe { get; set; } = default!;
+
+    private ElementReference host;
+    private Services.SceneInterop? scene;
+    private SceneState state = SceneState.Preparing;
+    private bool disposed;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || disposed)
+        {
+            return;
+        }
+
+        scene = new Services.SceneInterop(JS);
+        var ready = await scene.InitAsync(host, Universe);
+        if (!disposed)
+        {
+            state = ready ? SceneState.Ready : SceneState.Unavailable;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        if (scene is not null)
+        {
+            await scene.DisposeAsync();
+        }
+    }
+
+    private enum SceneState
+    {
+        Preparing,
+        Ready,
+        Unavailable
+    }
+}
