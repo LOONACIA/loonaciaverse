@@ -9,7 +9,8 @@
 ## 디렉토리 구조
 ```
 loonaciaverse/
-├─ Loonaciaverse.sln
+├─ global.json                       # .NET 10 SDK 고정
+├─ Loonaciaverse.slnx                # .NET 10 SDK 기본 솔루션 형식
 ├─ src/
 │  ├─ Loonaciaverse.Core/            # 콘텐츠 모델(record), IContentService. 외부 의존성 없음
 │  └─ Loonaciaverse.Web/             # Blazor WASM Standalone
