@@ -21,6 +21,7 @@ bodies:
       atmosphereColor: "#5fd4ff"
       noiseScale: 4.0
       glowIntensity: 0.4
+      surface: terran
     orbit:
       radius: 8.0
       periodSeconds: 75.0
@@ -36,6 +37,7 @@ bodies:
       atmosphereColor: "#bda5ff"
       noiseScale: 5.0
       glowIntensity: 0.3
+      surface: gas
     orbit:
       radius: 12.0
       periodSeconds: 100.0
@@ -46,10 +48,11 @@ bodies:
     tagline: 새로운 실험의 신호를 준비하고 있습니다.
     locked: true
     visual:
-      baseColor: "#785339"
-      atmosphereColor: "#ffb347"
+      baseColor: "#a65a35"
+      atmosphereColor: "#e8a46a"
       noiseScale: 6.0
-      glowIntensity: 0.2
+      glowIntensity: 0.25
+      surface: desert
     orbit:
       radius: 16.0
       periodSeconds: 120.0

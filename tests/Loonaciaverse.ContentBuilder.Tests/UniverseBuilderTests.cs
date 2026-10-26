@@ -18,9 +18,9 @@ public class UniverseBuilderTests
         Assert.Equal(new SiteInfo("LOONACIAVERSE", "https://example.com", "LOONACIA", "개인 우주입니다."), universe.Site);
         Assert.Equal(new[] { "about", "projects", "blog", "playground" }, universe.Bodies.Select(body => body.Id));
         var about = universe.Bodies[0];
-        Assert.Equal(new CelestialBody("about", "LOONACIA", "ABOUT", "소개입니다.", "/about", false, new BodyVisual("#fff2cc", "#ffd780", 3.5, 1.8), null), about);
+        Assert.Equal(new CelestialBody("about", "LOONACIA", "ABOUT", "소개입니다.", "/about", false, new BodyVisual("#fff2cc", "#ffd780", 3.5, 1.8, null), null), about);
         Assert.Equal(new BodyOrbit(8, 75, 0.5), universe.Bodies[1].Orbit);
-        Assert.Equal(new BodyVisual("#236b8e", "#5fd4ff", 4, 0.4), universe.Bodies[1].Visual);
+        Assert.Equal(new BodyVisual("#236b8e", "#5fd4ff", 4, 0.4, "terran"), universe.Bodies[1].Visual);
         Assert.Equal("/projects", universe.Bodies[1].Route);
         Assert.Equal("/blog", universe.Bodies[2].Route);
         Assert.True(universe.Bodies[3].Locked);
@@ -170,6 +170,30 @@ public class UniverseBuilderTests
         var yaml = ContentTestData.UniverseYaml.Replace("route: /about", "route: /about\n    orbit: { radius: 1, periodSeconds: 60, phase: 0 }");
         File.WriteAllText(Path.Combine(options.ContentDir, "universe.yml"), yaml);
         AssertFailure(options, "universe.yml: bodies[0]: about must not have an orbit.");
+    }
+
+    [Theory]
+    [InlineData("terran", 1)]
+    [InlineData("gas", 2)]
+    [InlineData("desert", 3)]
+    public void PlanetsRequireKnownSurface(string surface, int index)
+    {
+        using var directory = new TemporaryDirectory();
+        var options = CreateOptions(directory);
+        foreach (var replacement in new[] { "", ", surface: null", ", surface: ice", ", surface: Terran" })
+        {
+            File.WriteAllText(Path.Combine(options.ContentDir, "universe.yml"), ContentTestData.UniverseYaml.Replace($", surface: {surface}", replacement));
+            AssertFailure(options, $"universe.yml: bodies[{index}]: surface must be one of terran, gas, desert.");
+        }
+    }
+
+    [Fact]
+    public void AboutMustNotHaveSurface()
+    {
+        using var directory = new TemporaryDirectory();
+        var options = CreateOptions(directory);
+        File.WriteAllText(Path.Combine(options.ContentDir, "universe.yml"), ContentTestData.UniverseYaml.Replace("glowIntensity: 1.8 }", "glowIntensity: 1.8, surface: gas }"));
+        AssertFailure(options, "universe.yml: bodies[0]: about must not have a surface.");
     }
 
     [Theory]

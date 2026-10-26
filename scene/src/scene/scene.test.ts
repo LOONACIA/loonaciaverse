@@ -42,7 +42,7 @@ vi.mock("three/addons/postprocessing/EffectComposer.js", () => ({
 const universe: UniverseDto = {
   bodies: [{
     id: "planet", name: "PLANET", subtitle: "TEST", locked: false,
-    visual: { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4, glowIntensity: 0.4 },
+    visual: { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4, glowIntensity: 0.4, surface: "terran" },
     orbit: { radius: 16, periodSeconds: 80, phase: 0 },
   }],
 };
@@ -211,7 +211,7 @@ describe("scene render quality", () => {
     expect(composer.passes[2]).toBeInstanceOf(OutputPass);
     expect(composer.render).toHaveBeenCalledExactlyOnceWith(0);
     expect(composer.setSize).toHaveBeenCalledWith(1200, 800);
-    expect((scene.children.find((child) => child instanceof Points) as Points).geometry.getAttribute("position").count).toBe(3000);
+    expect((scene.children.find((child) => child instanceof Points) as Points).geometry.getAttribute("position").count).toBe(8000);
     Object.defineProperty(container, "clientWidth", { value: 400 });
     resize([], {} as ResizeObserver);
     expect(composer.setSize).toHaveBeenLastCalledWith(400, 800);
@@ -229,90 +229,32 @@ describe("scene render quality", () => {
     expect(composer.dispose).toHaveBeenCalledOnce();
   });
 
-  it.each(["coarse", "narrow"])("uses direct rendering, fewer stars and no parallax on %s devices", (device) => {
+  it.each(["coarse", "narrow"])("uses direct rendering and fewer stars on %s devices", (device) => {
     vi.spyOn(window, "devicePixelRatio", "get").mockReturnValue(3);
     if (device === "coarse") {
       vi.mocked(window.matchMedia).mockImplementation((query) => ({ matches: query === "(pointer: coarse)" }) as MediaQueryList);
     } else Object.defineProperty(container, "clientWidth", { value: 400 });
-    const { active, scene, camera } = startScene();
+    const { active, scene } = startScene();
     expect(active.setPixelRatio).toHaveBeenCalledWith(1.5);
     expect(EffectComposer).not.toHaveBeenCalled();
     expect(active.render).toHaveBeenCalledOnce();
-    expect((scene.children.find((child) => child instanceof Points) as Points).geometry.getAttribute("position").count).toBe(1500);
+    expect((scene.children.find((child) => child instanceof Points) as Points).geometry.getAttribute("position").count).toBe(4000);
     const streaks = scene.children.find((child) => child instanceof LineSegments) as LineSegments;
-    expect(streaks.geometry.getAttribute("position").count).toBe(3000);
-    const rotation = camera.quaternion.clone();
-    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
-    tick(1000);
-    expect(camera.quaternion.equals(rotation)).toBe(true);
+    expect(streaks.geometry.getAttribute("position").count).toBe(8000);
     expect(container.querySelector(".scene-label")).not.toBeNull();
   });
 });
 
-describe("scene parallax", () => {
-  it("smoothly offsets only the rendered rotation and returns to center on pointerleave", () => {
+describe("scene camera", () => {
+  it.each(["mouse", "pen", "touch"])("keeps the camera fixed while %s input moves", (pointerType) => {
     const { active, camera } = startScene();
     const position = camera.position.clone();
     const rotation = camera.quaternion.clone();
-    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
-    expect(camera.quaternion.equals(rotation)).toBe(true);
-    tick(16);
-    const firstAngle = camera.quaternion.angleTo(rotation);
-    expect(firstAngle).toBeGreaterThan(0);
-    expect(firstAngle).toBeLessThan(2 * Math.PI / 180);
-    tick(1000);
-    expect(camera.quaternion.angleTo(rotation)).toBeGreaterThan(firstAngle);
-    expect(camera.quaternion.angleTo(rotation)).toBeLessThanOrEqual(2 * Math.PI / 180 + 1e-9);
-    expect(camera.position.equals(position)).toBe(true);
-    active.domElement.dispatchEvent(new PointerEvent("pointerleave"));
-    tick(5000);
-    expect(camera.quaternion.angleTo(rotation)).toBeLessThan(1e-6);
-  });
-
-  it("keeps focus and interrupted tweens independent from the rendered parallax", () => {
-    const { active, camera, body } = startScene();
-    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
-    tick(100);
-    focus("planet", false);
-    tick(500);
-    clearFocus();
-    tick(1300);
-    expect(camera.position.toArray()).toEqual(Object.values(overviewPose(16.9, 1.5).position));
-    focus("planet", true);
-    const pose = focusPose(body.position, body.geometry.parameters.radius, 1.5);
-    const base = new PerspectiveCamera();
-    base.position.set(pose.position.x, pose.position.y, pose.position.z);
-    base.lookAt(pose.target.x, pose.target.y, pose.target.z);
-    expect(camera.position.equals(base.position)).toBe(true);
-    expect(camera.quaternion.angleTo(base.quaternion)).toBeGreaterThan(0);
-    tick(2300);
-    expect(camera.position.equals(base.position)).toBe(true);
-    expect(camera.quaternion.angleTo(base.quaternion)).toBeLessThanOrEqual(2 * Math.PI / 180 + 1e-9);
-  });
-
-  it.each(["pen", "touch"])("does not introduce parallax from %s input", (pointerType) => {
-    const { active, camera } = startScene();
-    const rotation = camera.quaternion.clone();
     active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType }));
+    tick(16);
     tick(1000);
+    expect(camera.position.equals(position)).toBe(true);
     expect(camera.quaternion.equals(rotation)).toBe(true);
-  });
-
-  it("removes the parallax rotation before warp and ignores further pointer input", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
-    const { active, camera } = startScene();
-    const rotation = camera.quaternion.clone();
-    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 1220, clientY: 30, pointerType: "mouse" }));
-    tick(1000);
-    expect(camera.quaternion.angleTo(rotation)).toBeGreaterThan(0);
-    const pending = warp("planet");
-    expect(camera.quaternion.angleTo(rotation)).toBeLessThan(1e-6);
-    active.domElement.dispatchEvent(new PointerEvent("pointermove", { clientX: 20, clientY: 830, pointerType: "mouse" }));
-    tick(1001);
-    expect(camera.quaternion.angleTo(rotation)).toBeLessThan(1e-6);
-    // Disposal also resolves travel, so this check does not wait on a wall-clock timer.
-    dispose();
-    await pending;
   });
 });
 

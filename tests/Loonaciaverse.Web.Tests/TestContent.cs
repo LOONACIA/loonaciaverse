@@ -46,5 +46,5 @@ public static class TestContent
     }
 
     private static CelestialBody Body(string id, string name, string subtitle, string? route, bool locked = false) =>
-        new(id, name, subtitle, "테스트 천체", route, locked, new BodyVisual("#123456", "#abcdef", 1, 0.8), id == "about" ? null : new BodyOrbit(10, 60, 0));
+        new(id, name, subtitle, "테스트 천체", route, locked, new BodyVisual("#123456", "#abcdef", 1, 0.8, id == "about" ? null : "terran"), id == "about" ? null : new BodyOrbit(10, 60, 0));
 }

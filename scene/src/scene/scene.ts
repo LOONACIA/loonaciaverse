@@ -9,7 +9,7 @@ import { CameraTween, focusPose, overviewPose } from "./camera";
 import type { Pose } from "./camera";
 import { createBodyLabel } from "./labels";
 import { shouldPauseOrbits } from "./orbit";
-import { getQuality, parallaxOffset } from "./quality";
+import { getQuality } from "./quality";
 import type { RenderQuality } from "./quality";
 import { createFocusRing } from "./ring";
 import { createSystem } from "./system";
@@ -34,8 +34,6 @@ interface SceneState {
   renderer: WebGLRenderer;
   composer: EffectComposer | null;
   quality: RenderQuality;
-  parallaxPointer: Vector2;
-  parallaxAngles: Vector2;
   labelRenderer: CSS2DRenderer;
   labels: ReturnType<typeof createBodyLabel>[];
   ring: ReturnType<typeof createFocusRing>;
@@ -62,14 +60,6 @@ function applyPose(camera: PerspectiveCamera, pose: Pose): void {
   camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
 }
 
-function applyRenderPose(current: SceneState, pose: Pose): void {
-  applyPose(current.camera, pose);
-  if (!current.quality.parallax || current.warp) return;
-  // Never feed the rendered rotation back into CameraTween.
-  current.camera.rotateX(current.parallaxAngles.x);
-  current.camera.rotateY(current.parallaxAngles.y);
-}
-
 function bodyPose(current: SceneState, bodyId: string): Pose | null {
   const body = current.system.bodies.find((mesh) => mesh.userData.bodyId === bodyId);
   return body ? focusPose(body.position, body.geometry.parameters.radius, current.camera.aspect) : null;
@@ -93,7 +83,7 @@ export function focus(bodyId: string, immediate: boolean): void {
   state.focusedId = bodyId;
   state.ring.focus(state.system.bodies.find((mesh) => mesh.userData.bodyId === bodyId)!, immediate);
   state.tween.retarget(pose, immediate ? 0 : 0.8);
-  applyRenderPose(state, state.tween.current);
+  applyPose(state.camera, state.tween.current);
   updateDecorations(state);
 }
 
@@ -127,10 +117,7 @@ export function warp(bodyId: string): Promise<void> {
   if (!body) return Promise.resolve();
   if (current.warp) return current.warp.promise;
 
-  // Start travel from the unmodified tween pose; parallax is disabled during warp.
   applyPose(current.camera, current.tween.current);
-  current.parallaxAngles.set(0, 0);
-  current.parallaxPointer.set(0, 0);
   const startPosition = current.camera.position.clone();
   const direction = body.position.clone().sub(startPosition);
   const distance = direction.length();
@@ -191,7 +178,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   }
 
   const quality = getQuality({ devicePixelRatio: window.devicePixelRatio, coarsePointer: window.matchMedia("(pointer: coarse)").matches, viewportWidth: container.clientWidth });
-  const system = createSystem(universe, quality.starCount);
+  const system = createSystem(universe, quality.starCount, quality.pixelRatio);
   const labelRenderer = new CSS2DRenderer();
   labelRenderer.domElement.className = "scene-label-layer";
   Object.assign(labelRenderer.domElement.style, { position: "absolute", inset: "0", pointerEvents: "none", zIndex: "0" });
@@ -222,7 +209,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     if (!current.warp) {
       const pose = current.focusedId === null ? overview : bodyPose(current, current.focusedId)!;
       current.tween.retarget(pose, 0);
-      applyRenderPose(current, pose);
+      applyPose(camera, pose);
     }
     camera.far = Math.max(1000, Math.hypot(overview.position.x, overview.position.y, overview.position.z) + system.radius * 16);
     camera.updateProjectionMatrix();
@@ -237,13 +224,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     current.lastTimestamp = timestamp;
     system.update(delta, current.warp !== null || shouldPauseOrbits(current.focusedId !== null, current.hoveredId !== null, current.highlightedId !== null));
     if (current.warp) updateWarp(current, performance.now() - current.warp.startedAt);
-    else {
-      if (quality.parallax) {
-        const offset = parallaxOffset(current.parallaxPointer, 2);
-        current.parallaxAngles.lerp(new Vector2(offset.x, offset.y), 1 - Math.exp(-6 * Math.max(0, delta)));
-      }
-      applyRenderPose(current, current.tween.step(delta));
-    }
+    else applyPose(camera, current.tween.step(delta));
     updateDecorations(current, delta);
     if (composer) composer.render(delta);
     else renderer.render(system.scene, camera);
@@ -278,7 +259,6 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   };
   const onPointerLeave = () => {
     if (current.warp) return;
-    current.parallaxPointer.set(0, 0);
     current.hoveredId = null;
     renderer.domElement.style.cursor = "";
     updateDecorations(current);
@@ -290,8 +270,6 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
       return;
     }
     current.hoveredId = pick(event);
-    if (event.pointerType === "mouse" && quality.parallax) current.parallaxPointer.copy(pointer);
-    else current.parallaxPointer.set(0, 0);
     renderer.domElement.style.cursor = current.hoveredId === null ? "" : "pointer";
     updateDecorations(current);
   };
@@ -316,7 +294,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   const observer = new ResizeObserver(resize);
   const initialPose = overviewPose(system.radius, 1);
   const current: SceneState = {
-    container, renderer, composer, quality, parallaxPointer: new Vector2(), parallaxAngles: new Vector2(),
+    container, renderer, composer, quality,
     labelRenderer, labels, ring, originalContainerPosition, system, callbacks, camera, tween: new CameraTween(initialPose, initialPose, 0),
     focusedId: null, hoveredId: null, highlightedId: null, removePointerListeners,
     observer, onVisibilityChange, frameId: null, lastTimestamp: null, warp: null,

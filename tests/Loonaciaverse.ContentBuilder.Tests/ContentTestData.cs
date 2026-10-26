@@ -17,21 +17,21 @@ internal static class ContentTestData
             subtitle: PROJECTS
             tagline: 작업들입니다.
             route: /projects
-            visual: { baseColor: '#236b8e', atmosphereColor: '#5fd4ff', noiseScale: 4, glowIntensity: 0.4 }
+            visual: { baseColor: '#236b8e', atmosphereColor: '#5fd4ff', noiseScale: 4, glowIntensity: 0.4, surface: terran }
             orbit: { radius: 8, periodSeconds: 75, phase: 0.5 }
           - id: blog
             name: ARCHIVA
             subtitle: BLOG
             tagline: 기록입니다.
             route: /blog
-            visual: { baseColor: '#6956a8', atmosphereColor: '#bda5ff', noiseScale: 5, glowIntensity: 0.3 }
+            visual: { baseColor: '#6956a8', atmosphereColor: '#bda5ff', noiseScale: 5, glowIntensity: 0.3, surface: gas }
             orbit: { radius: 12, periodSeconds: 100, phase: 2.5 }
           - id: playground
             name: ARCADIA
             subtitle: PLAYGROUND
             tagline: 실험을 준비합니다.
             locked: true
-            visual: { baseColor: '#785339', atmosphereColor: '#ffb347', noiseScale: 6, glowIntensity: 0.2 }
+            visual: { baseColor: '#785339', atmosphereColor: '#ffb347', noiseScale: 6, glowIntensity: 0.2, surface: desert }
             orbit: { radius: 16, periodSeconds: 120, phase: 4.5 }
         """;
 

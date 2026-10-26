@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { AdditiveBlending, BackSide, Color, ShaderMaterial } from "three";
-import { createAtmosphereMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial, createStarMaterial } from "./materials";
+import {
+  createAtmosphereMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial, createPlanetRingMaterial,
+  createStarFieldMaterial, createStarMaterial,
+} from "./materials";
 import type { BodyDto } from "./types";
 
 const visuals: BodyDto["visual"][] = [
-  { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4, glowIntensity: 0.4 },
-  { baseColor: "#fff2cc", atmosphereColor: "#ffd780", noiseScale: 3.5, glowIntensity: 1.8 },
-  { baseColor: "#785339", atmosphereColor: "#ffb347", noiseScale: 6, glowIntensity: 0 },
+  { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4, glowIntensity: 0.4, surface: "terran" },
+  { baseColor: "#6956a8", atmosphereColor: "#bda5ff", noiseScale: 5, glowIntensity: 1.8, surface: "gas" },
+  { baseColor: "#785339", atmosphereColor: "#ffb347", noiseScale: 6, glowIntensity: 0, surface: "desert" },
 ];
 
 describe("procedural materials", () => {
@@ -15,30 +18,56 @@ describe("procedural materials", () => {
     const star = createStarMaterial(visual);
     const atmosphere = createAtmosphereMaterial(visual);
     const corona = createCoronaMaterial(visual);
+    const ring = createPlanetRingMaterial(visual);
     try {
       expect(planet.uniforms).toEqual({
         uBaseColor: { value: new Color(visual.baseColor) },
+        uAtmosphereColor: { value: new Color(visual.atmosphereColor) },
         uNoiseScale: { value: visual.noiseScale },
         uTime: { value: 0 },
       });
       expect(star.uniforms).toEqual({ ...planet.uniforms, uGlowIntensity: { value: visual.glowIntensity } });
+      const { uTime: _, ...ringUniforms } = planet.uniforms;
+      expect(ring.uniforms).toEqual(ringUniforms);
+      const glow = { uAtmosphereColor: { value: new Color(visual.atmosphereColor) }, uGlowIntensity: { value: visual.glowIntensity } };
+      expect(atmosphere.uniforms).toEqual(glow);
+      expect(corona.uniforms).toEqual({ ...glow, uTime: { value: 0 } });
       for (const material of [atmosphere, corona]) {
-        expect(material.uniforms).toEqual({
-          uAtmosphereColor: { value: new Color(visual.atmosphereColor) },
-          uGlowIntensity: { value: visual.glowIntensity },
-        });
         expect(material.blending).toBe(AdditiveBlending);
         expect(material.transparent).toBe(true);
         expect(material.depthWrite).toBe(false);
       }
+      expect(atmosphere.side).toBe(BackSide);
+      expect(ring.transparent).toBe(true);
+      expect(ring.depthWrite).toBe(false);
     } finally {
-      [planet, star, atmosphere, corona].forEach((material) => material.dispose());
+      [planet, star, atmosphere, corona, ring].forEach((material) => material.dispose());
     }
   });
 
-  const factories = [createPlanetMaterial, createAtmosphereMaterial, createStarMaterial, createCoronaMaterial, createNebulaMaterial];
-  it.each(factories)("declares every supplied uniform with the matching GLSL type: %s", (createMaterial) => {
-    const material = createMaterial(visuals[0]);
+  it("gives each planet surface type its own surface shader", () => {
+    const materials = visuals.map(createPlanetMaterial);
+    try {
+      const shaders = materials.map((material) => material.fragmentShader);
+      expect(new Set(shaders).size).toBe(visuals.length);
+      shaders.forEach((shader) => expect(shader).toMatch(/vec3 surface\(vec3 direction, float light, inout vec3 normal, out float gloss, out vec3 emission\)/));
+      expect(new Set(materials.map((material) => material.vertexShader)).size).toBe(1);
+    } finally {
+      materials.forEach((material) => material.dispose());
+    }
+  });
+
+  const factories: [string, () => ShaderMaterial][] = [
+    ["planet", () => createPlanetMaterial(visuals[0])],
+    ["atmosphere", () => createAtmosphereMaterial(visuals[0])],
+    ["planet ring", () => createPlanetRingMaterial(visuals[0])],
+    ["star", () => createStarMaterial(visuals[0])],
+    ["corona", () => createCoronaMaterial(visuals[0])],
+    ["star field", () => createStarFieldMaterial(1.5)],
+    ["nebula", () => createNebulaMaterial()],
+  ];
+  it.each(factories)("declares every supplied uniform with the matching GLSL type: %s", (_, createMaterial) => {
+    const material = createMaterial();
     try {
       expect(material).toBeInstanceOf(ShaderMaterial);
       const shaders = material.vertexShader + "\n" + material.fragmentShader;
@@ -51,6 +80,22 @@ describe("procedural materials", () => {
       expect(declaredUniforms.sort()).toEqual(Object.keys(material.uniforms).sort());
       expect(material.fragmentShader).toContain("#include <tonemapping_fragment>");
       expect(material.fragmentShader).toContain("#include <colorspace_fragment>");
+    } finally {
+      material.dispose();
+    }
+  });
+
+  it("draws the star field as additive screen-sized points that start fully visible", () => {
+    const material = createStarFieldMaterial(1.5);
+    try {
+      expect(material.name).toBe("star-field");
+      expect(material.uniforms).toEqual({ uTime: { value: 0 }, uOpacity: { value: 1 }, uPixelRatio: { value: 1.5 } });
+      expect(material.vertexShader).toMatch(/gl_PointSize\s*=\s*aSize \* uPixelRatio;/);
+      for (const attribute of ["float aSize", "vec3 aColor", "vec3 aTwinkle"]) {
+        expect(material.vertexShader).toContain(`attribute ${attribute};`);
+      }
+      expect(material.blending).toBe(AdditiveBlending);
+      expect(material.depthWrite).toBe(false);
     } finally {
       material.dispose();
     }

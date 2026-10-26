@@ -9,22 +9,22 @@ const universe: UniverseDto = {
   bodies: [
     {
       id: "about", name: "LOONACIA", subtitle: "ABOUT", locked: false,
-      visual: { baseColor: "#fff2cc", atmosphereColor: "#ffd780", noiseScale: 3.5, glowIntensity: 1.8 },
+      visual: { baseColor: "#fff2cc", atmosphereColor: "#ffd780", noiseScale: 3.5, glowIntensity: 1.8, surface: null },
       orbit: null,
     },
     {
       id: "projects", name: "ARTIFEX", subtitle: "PROJECTS", locked: false,
-      visual: { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4.0, glowIntensity: 0.4 },
+      visual: { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4.0, glowIntensity: 0.4, surface: "terran" },
       orbit: { radius: 8.0, periodSeconds: 75.0, phase: 0.5 },
     },
     {
       id: "blog", name: "ARCHIVA", subtitle: "BLOG", locked: false,
-      visual: { baseColor: "#6956a8", atmosphereColor: "#bda5ff", noiseScale: 5.0, glowIntensity: 0.3 },
+      visual: { baseColor: "#6956a8", atmosphereColor: "#bda5ff", noiseScale: 5.0, glowIntensity: 0.3, surface: "gas" },
       orbit: { radius: 12.0, periodSeconds: 100.0, phase: 2.5 },
     },
     {
       id: "playground", name: "ARCADIA", subtitle: "PLAYGROUND", locked: true,
-      visual: { baseColor: "#785339", atmosphereColor: "#ffb347", noiseScale: 6.0, glowIntensity: 0.2 },
+      visual: { baseColor: "#a65a35", atmosphereColor: "#e8a46a", noiseScale: 6.0, glowIntensity: 0.25, surface: "desert" },
       orbit: { radius: 16.0, periodSeconds: 120.0, phase: 4.5 },
     },
   ],

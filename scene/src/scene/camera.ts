@@ -10,8 +10,8 @@ export interface Pose {
 }
 
 // Fixed oblique view, with camera-right +X and camera-up (0, 0.8, -0.6).
-const BACK = { x: 0, y: 0.6, z: 0.8 };
-const UP = { x: 0, y: 0.8, z: -0.6 };
+export const BACK = { x: 0, y: 0.6, z: 0.8 };
+export const UP = { x: 0, y: 0.8, z: -0.6 };
 const HALF_FOV = Math.PI / 8;
 
 function positionFrom(target: Vector3, distance: number): Vector3 {

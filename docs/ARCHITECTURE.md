@@ -35,16 +35,17 @@ loonaciaverse/
 │  └─ Loonaciaverse.BudgetCheck/     # 콘솔: publish 결과의 홈 전송량 검사
 ├─ scene/                            # npm 프로젝트: TypeScript + Vite + Vitest
 │  ├─ src/scene/
-│  │  ├─ scene.ts                   # 공개 계약, 렌더 루프, 입력, 블룸·패럴랙스, 수명주기
+│  │  ├─ scene.ts                   # 공개 계약, 렌더 루프, 입력, 블룸, 수명주기
 │  │  ├─ types.ts                   # UniverseDto, BodyDto, DotNetCallbacks
-│  │  ├─ system.ts                  # 천체·별 필드·성운 생성, 자전, 셰이더 시간, 별 궤적
-│  │  ├─ materials.ts               # 천체 표면·대기·코로나·성운의 절차적 셰이더
+│  │  ├─ system.ts                  # 천체·고리·별 필드·성운·유성 생성, 자전, 셰이더 시간, 별 궤적
+│  │  ├─ materials.ts               # 천체 표면(surface별)·대기·고리·코로나·별 필드·성운의 절차적 셰이더
+│  │  ├─ meteor.ts                  # 가끔 배경을 가로지르는 유성, 대기·비행 주기
 │  │  ├─ labels.ts                  # CSS2D 이름표, 클릭·호버, 표시 상태
 │  │  ├─ ring.ts                    # 포커스 홀로그램 링, 회전·페이드
 │  │  ├─ orbit.ts                   # 공전 위치·시간·정지 조건
 │  │  ├─ camera.ts                  # 화면 비별 카메라 구도, 보간·트윈
 │  │  ├─ warp.ts                    # 900ms 워프 타임라인
-│  │  ├─ quality.ts                 # 품질 단계 선택, 패럴랙스 각도 계산
+│  │  ├─ quality.ts                 # 품질 단계 선택
 │  │  └─ *.test.ts                  # Vitest 테스트
 │  ├─ src/highlight.ts               # highlight.js 래퍼 (필요한 언어만 등록)
 │  ├─ src/toc.ts                     # 목차 클릭 스크롤
@@ -94,7 +95,7 @@ public interface IContentService
 - 글 front matter: `title`, `slug`, `date`, `updated?`, `summary`, `tags`, `draft`, `cover?`
 - 프로젝트 front matter: `title`, `slug`, `summary`, `period`, `role`, `stack`, `links`(github, store, video 등), `thumbnail`, `featured`, `order`, `draft`
 - `about.md` front matter: `name`, `title`(직함), `stack`, `email`, `github`, `linkedin`
-- 천체(`universe.yml`): `id`(`about`|`projects`|`blog`|`playground`), `name`(세계관 이름), `subtitle`(카테고리), `tagline`, `route`, `locked`, `visual`(셰이더 파라미터: 색상, 노이즈 스케일, 대기 색 등), `orbit`(반지름, 주기, 위상)
+- 천체(`universe.yml`): `id`(`about`|`projects`|`blog`|`playground`), `name`(세계관 이름), `subtitle`(카테고리), `tagline`, `route`, `locked`, `visual`(셰이더 파라미터: 색상, 노이즈 스케일, 대기 색, 글로우 세기, 행성 `surface`(`terran`|`gas`|`desert`, 항성은 생략)), `orbit`(반지름, 주기, 위상)
 
 ## 빌드 산출물 (`wwwroot/content/`)
 | 파일 | 내용 |
@@ -162,9 +163,9 @@ export function dispose(): void;
 - `init`은 이전 씬을 dispose한 뒤 컨테이너 안에 캔버스와 CSS2D 이름표 레이어를 만든다. 렌더러 생성 실패도 `false`로 반환한다. `ResizeObserver`로 크기를 맞추고, `visibilitychange`로 숨겨진 탭의 렌더 루프를 멈춘다.
 - `focus`는 `immediate`가 true이면 즉시, false이면 0.8초 트윈으로 천체에 접근한다. `clearFocus`는 0.8초 트윈으로 전체 구도로 돌아간다. `highlight`는 키보드로 강조할 천체를 지정하며 `null`로 해제한다. 포커스·호버·키보드 강조 중에는 공전을 멈추지만 자전과 셰이더 시간은 계속 흐른다.
 - C# 콜백은 `SceneInterop`의 `[JSInvokable] public Task OnBodyClicked(string? id)` 하나다. `null`은 빈 공간 클릭이며, 이름표 클릭도 같은 콜백으로 전달한다. 호버 콜백은 없고 씬 내부에서만 처리한다.
-- `warp`는 카메라 돌진·별 궤적·배경색 페이드를 실행한다. 완료는 `requestAnimationFrame`에 의존하지 않는 `setTimeout(..., 900)`으로 resolve하므로 렌더 루프가 멈춰도 완료를 기다릴 수 있다. 워프를 시작하면 입력과 포커스·강조 명령을 무시하고 이름표·링·패럴랙스를 숨기거나 끈다. 반복 호출은 진행 중인 Promise를 반환하며, 씬이 없거나 id가 유효하지 않으면 즉시 resolve한다.
+- `warp`는 카메라 돌진·별 궤적·배경색 페이드를 실행한다. 완료는 `requestAnimationFrame`에 의존하지 않는 `setTimeout(..., 900)`으로 resolve하므로 렌더 루프가 멈춰도 완료를 기다릴 수 있다. 워프를 시작하면 입력과 포커스·강조 명령을 무시하고 이름표와 링을 숨긴다. 반복 호출은 진행 중인 Promise를 반환하며, 씬이 없거나 id가 유효하지 않으면 즉시 resolve한다.
 - `dispose`는 렌더 루프·이벤트·observer·DOM·GPU 리소스·블룸 패스를 해제하고, 진행 중인 워프 타이머를 취소하며 Promise도 resolve한다. 다시 초기화하거나 여러 번 해제할 수 있다.
-- Three.js에 의존하지 않는 순수 로직 모듈은 `orbit.ts`(공전 위치, 공전 시계, 정지 조건), `camera.ts`(전체·포커스 구도, easing, 보간, 트윈), `warp.ts`(돌진·궤적·페이드 타임라인), `quality.ts`(품질 단계, 패럴랙스 각도)다. `labels.ts`의 표시 상태와 `ring.ts`의 불투명도 목표·페이드 계산도 순수 함수로 검증한다. URL↔포커스와 history 규칙은 `StarSystem`의 책임이다.
+- Three.js에 의존하지 않는 순수 로직 모듈은 `orbit.ts`(공전 위치, 공전 시계, 정지 조건), `camera.ts`(전체·포커스 구도, easing, 보간, 트윈), `warp.ts`(돌진·궤적·페이드 타임라인), `quality.ts`(품질 단계)다. `labels.ts`의 표시 상태와 `ring.ts`의 불투명도 목표·페이드 계산도 순수 함수로 검증하고, `meteor.ts`의 대기·비행 주기는 `Math.random`을 고정해 검증한다. URL↔포커스와 history 규칙은 `StarSystem`의 책임이다.
 
 ## 횡단 관심사
 - **에러 처리**:
@@ -192,7 +193,7 @@ export function dispose(): void;
 | ContentBuilder (front matter 파싱, 검증 실패, 인덱스·RSS·sitemap·TOC 생성, 초안 제외, YouTube 임베드) | xUnit | `dotnet test` |
 | Web 컴포넌트·SceneInterop (URL↔포커스, history·닫기, 키보드 순환·DOM 포커스, TRAVEL·실패 시 이동, fallback·수명주기, HUD 스탯·잠금, 상단 바, 목록·상세 렌더, 404), OG 일치·이미지 및 SWA 설정 검사 | xUnit + bUnit + 가짜 `IContentService`·JS interop | `dotnet test` |
 | 전송량 예산 검사 (집계·제외 대상, `.br` 우선, Pretendard 청크 선택, 필수 자산, 한도 경계, 종료 코드) | xUnit | `dotnet test` |
-| 씬 순수 로직 (공전 위치·시간·정지 조건, 카메라 구도·보간·트윈, 워프 타임라인, 품질 단계·패럴랙스 각도, 이름표 상태·링 페이드) | Vitest | `npm test --prefix scene` |
+| 씬 순수 로직 (공전 위치·시간·정지 조건, 카메라 구도·보간·트윈, 워프 타임라인, 품질 단계, 이름표 상태·링 페이드, 유성 주기) | Vitest | `npm test --prefix scene` |
 | 씬 구성·계약 (천체·별·셰이더 uniforms, 이름표·링, 클릭·호버·강조, 워프 타이머·입력 차단, resize·블룸·dispose) | Vitest + happy-dom, 렌더러·composer 모의 객체 | `npm test --prefix scene` |
 | 3D 렌더링 결과, 셰이더 표현, 연출 | 수동 확인(sandbox, 실제 사이트) | `npm run dev --prefix scene` |
 

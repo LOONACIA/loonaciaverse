@@ -2,7 +2,7 @@ namespace Loonaciaverse.Core.Content;
 
 public sealed record SiteInfo(string Title, string BaseUrl, string Author, string Description);
 
-public sealed record BodyVisual(string BaseColor, string AtmosphereColor, double NoiseScale, double GlowIntensity);
+public sealed record BodyVisual(string BaseColor, string AtmosphereColor, double NoiseScale, double GlowIntensity, string? Surface);
 
 public sealed record BodyOrbit(double Radius, double PeriodSeconds, double Phase);
 

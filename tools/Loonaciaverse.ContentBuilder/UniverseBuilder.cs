@@ -9,6 +9,7 @@ namespace Loonaciaverse.ContentBuilder;
 public static class UniverseBuilder
 {
     private static readonly string[] BodyIds = ["about", "projects", "blog", "playground"];
+    private static readonly string[] PlanetSurfaces = ["terran", "gas", "desert"];
     private static readonly IDeserializer Deserializer = new DeserializerBuilder().WithNamingConvention(CamelCaseNamingConvention.Instance).IgnoreUnmatchedProperties().Build();
 
     public static BuildResult Build(string contentDir, string contentOutputDir, bool generateOutput = true)
@@ -111,6 +112,14 @@ public static class UniverseBuilder
             {
                 errors.Add($"{sourcePath}: visual is required.");
             }
+            else if (body.Id == "about" && body.Visual.Surface is not null)
+            {
+                errors.Add($"{sourcePath}: about must not have a surface.");
+            }
+            else if (body.Id != "about" && !PlanetSurfaces.Contains(body.Visual.Surface, StringComparer.Ordinal))
+            {
+                errors.Add($"{sourcePath}: surface must be one of {string.Join(", ", PlanetSurfaces)}.");
+            }
 
             if (body.Id == "about" && body.Orbit is not null)
             {
@@ -135,7 +144,7 @@ public static class UniverseBuilder
 
     private static CelestialBody CreateBody(BodyData body)
     {
-        var visual = new BodyVisual(body.Visual!.BaseColor, body.Visual.AtmosphereColor, body.Visual.NoiseScale, body.Visual.GlowIntensity);
+        var visual = new BodyVisual(body.Visual!.BaseColor, body.Visual.AtmosphereColor, body.Visual.NoiseScale, body.Visual.GlowIntensity, body.Visual.Surface);
         var orbit = body.Orbit is { } data ? new BodyOrbit(data.Radius, data.PeriodSeconds, data.Phase) : null;
         return new CelestialBody(body.Id, body.Name, body.Subtitle, body.Tagline, body.Route, body.Locked, visual, orbit);
     }
@@ -171,6 +180,7 @@ public static class UniverseBuilder
         public string AtmosphereColor { get; set; } = "";
         public double NoiseScale { get; set; }
         public double GlowIntensity { get; set; }
+        public string? Surface { get; set; }
     }
 
     public sealed class OrbitData

@@ -21,7 +21,7 @@ public class HttpContentServiceTests
             "universe", "content/universe.json",
             new Universe(
                 new SiteInfo("Loonaciaverse", "https://example.com/site", "Loona", "My universe"),
-                [new CelestialBody("blog", "Blog", "Posts", "Read on", "/blog", false, new BodyVisual("#123456", "#abcdef", 1.5, 0.8), new BodyOrbit(10, 60, 0.5))],
+                [new CelestialBody("blog", "Blog", "Posts", "Read on", "/blog", false, new BodyVisual("#123456", "#abcdef", 1.5, 0.8, "gas"), new BodyOrbit(10, 60, 0.5))],
                 new HudStats(new BlogStats(1, Post.Date, ["dotnet"], Post), new ProjectStats(1, ["C#"], Project), new AboutStats(About.Title, About.Stack, About.Email, About.Github, About.Linkedin)))
         },
         { "posts", "content/posts.json", new[] { Post } },
