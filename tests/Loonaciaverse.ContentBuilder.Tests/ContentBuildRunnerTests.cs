@@ -9,6 +9,7 @@ public class ContentBuildRunnerTests
         var contentDir = Path.Combine(directory.Root, "source");
         var options = new BuildOptions(contentDir, Path.Combine(directory.Root, "wwwroot"), false);
         ContentTestData.WriteAbout(contentDir);
+        ContentTestData.WriteUniverse(contentDir);
         Assert.True(ContentBuildRunner.Run(options).Success);
         var postDir = Directory.CreateDirectory(Path.Combine(contentDir, "posts", "invalid")).FullName;
         File.WriteAllText(Path.Combine(postDir, "index.md"), "---\ndraft: true\n---\nBody");
@@ -61,13 +62,14 @@ public class ContentBuildRunnerTests
         File.WriteAllText(styleFile, "keep css");
 
         ContentTestData.WriteAbout(contentDir);
+        ContentTestData.WriteUniverse(contentDir);
 
         var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, true));
 
         Assert.True(result.Success);
         Assert.Empty(result.Errors);
         Assert.True(Directory.Exists(contentOutputDir));
-        Assert.Equal(new[] { "about.json", "posts.json", "projects.json" }, Directory.EnumerateFileSystemEntries(contentOutputDir).Select(Path.GetFileName).Order(StringComparer.Ordinal));
+        Assert.Equal(new[] { "about.json", "posts.json", "projects.json", "universe.json" }, Directory.EnumerateFileSystemEntries(contentOutputDir).Select(Path.GetFileName).Order(StringComparer.Ordinal));
         Assert.Equal("[]", File.ReadAllText(Path.Combine(contentOutputDir, "projects.json")));
         Assert.Equal("[]", File.ReadAllText(Path.Combine(contentOutputDir, "posts.json")));
         Assert.Equal("keep html", File.ReadAllText(otherFile));
@@ -83,6 +85,7 @@ public class ContentBuildRunnerTests
         var outputDir = Path.Combine(directory.Root, "wwwroot");
 
         ContentTestData.WriteAbout(contentDir);
+        ContentTestData.WriteUniverse(contentDir);
 
         var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, false));
 

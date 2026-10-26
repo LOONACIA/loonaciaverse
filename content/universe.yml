@@ -1,0 +1,56 @@
+bodies:
+  - id: about
+    name: LOONACIA
+    subtitle: ABOUT
+    tagline: 만들고 배우며 나만의 우주를 넓혀 갑니다.
+    route: /about
+    locked: false
+    visual:
+      baseColor: "#fff2cc"
+      atmosphereColor: "#ffd780"
+      noiseScale: 3.5
+      glowIntensity: 1.8
+  - id: projects
+    name: ARTIFEX
+    subtitle: PROJECTS
+    tagline: 아이디어를 실제 경험으로 만든 작업들입니다.
+    route: /projects
+    locked: false
+    visual:
+      baseColor: "#236b8e"
+      atmosphereColor: "#5fd4ff"
+      noiseScale: 4.0
+      glowIntensity: 0.4
+    orbit:
+      radius: 8.0
+      periodSeconds: 75.0
+      phase: 0.5
+  - id: blog
+    name: ARCHIVA
+    subtitle: BLOG
+    tagline: 개발의 발견과 회고를 차곡차곡 기록합니다.
+    route: /blog
+    locked: false
+    visual:
+      baseColor: "#6956a8"
+      atmosphereColor: "#bda5ff"
+      noiseScale: 5.0
+      glowIntensity: 0.3
+    orbit:
+      radius: 12.0
+      periodSeconds: 100.0
+      phase: 2.5
+  - id: playground
+    name: ARCADIA
+    subtitle: PLAYGROUND
+    tagline: 새로운 실험의 신호를 준비하고 있습니다.
+    locked: true
+    visual:
+      baseColor: "#785339"
+      atmosphereColor: "#ffb347"
+      noiseScale: 6.0
+      glowIntensity: 0.2
+    orbit:
+      radius: 16.0
+      periodSeconds: 120.0
+      phase: 4.5

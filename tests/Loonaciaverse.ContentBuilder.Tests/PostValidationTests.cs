@@ -240,6 +240,7 @@ public class PostValidationTests
     private static BuildOptions CreateOptions(TemporaryDirectory directory)
     {
         ContentTestData.WriteAbout(Path.Combine(directory.Root, "source"));
+        ContentTestData.WriteUniverse(Path.Combine(directory.Root, "source"));
         return new BuildOptions(Path.Combine(directory.Root, "source"), Path.Combine(directory.Root, "wwwroot"), false);
     }
 

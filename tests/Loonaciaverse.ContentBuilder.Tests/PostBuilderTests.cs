@@ -47,6 +47,7 @@ public class PostBuilderTests
         File.WriteAllBytes(Path.Combine(contentDir, "posts", "alpha", "cover.png"), [1, 2, 3]);
 
         ContentTestData.WriteAbout(contentDir);
+        ContentTestData.WriteUniverse(contentDir);
 
         var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, true));
 
@@ -101,6 +102,7 @@ public class PostBuilderTests
         }
 
         ContentTestData.WriteAbout(contentDir);
+        ContentTestData.WriteUniverse(contentDir);
 
         var result = ContentBuildRunner.Run(new BuildOptions(contentDir, outputDir, false));
 

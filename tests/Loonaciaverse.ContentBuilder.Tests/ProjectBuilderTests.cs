@@ -187,6 +187,7 @@ public class ProjectBuilderTests
     {
         var options = new BuildOptions(Path.Combine(directory.Root, "source"), Path.Combine(directory.Root, "wwwroot"), false);
         ContentTestData.WriteAbout(options.ContentDir);
+        ContentTestData.WriteUniverse(options.ContentDir);
         return options;
     }
 

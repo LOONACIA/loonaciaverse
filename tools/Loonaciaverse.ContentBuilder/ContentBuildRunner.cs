@@ -23,6 +23,7 @@ public static class ContentBuildRunner
             errors.AddRange(PostBuilder.Build(options.ContentDir, contentOutputDir, options.IncludeDrafts).Errors);
             errors.AddRange(ProjectBuilder.Build(options.ContentDir, contentOutputDir, options.IncludeDrafts).Errors);
             errors.AddRange(AboutBuilder.Build(options.ContentDir, contentOutputDir).Errors);
+            errors.AddRange(UniverseBuilder.Build(options.ContentDir, contentOutputDir, generateOutput: errors.Count == 0).Errors);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {

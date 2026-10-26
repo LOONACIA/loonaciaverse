@@ -154,6 +154,7 @@ public class PostAssetsAndTocTests
     {
         var options = new BuildOptions(Path.Combine(directory.Root, "source"), Path.Combine(directory.Root, "wwwroot"), false);
         ContentTestData.WriteAbout(options.ContentDir);
+        ContentTestData.WriteUniverse(options.ContentDir);
         var postDir = Directory.CreateDirectory(Path.Combine(options.ContentDir, "posts", "example")).FullName;
         File.WriteAllText(Path.Combine(postDir, "index.md"), $"---\ntitle: Example\nslug: example\ndate: 2026-10-26\nsummary: Summary\n{metadata}\n---\n{body}");
         return options;

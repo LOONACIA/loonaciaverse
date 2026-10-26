@@ -55,6 +55,7 @@ public class AboutBuilderTests
     {
         using var directory = new TemporaryDirectory();
         var options = new BuildOptions(directory.Root, Path.Combine(directory.Root, "wwwroot"), false);
+        ContentTestData.WriteUniverse(options.ContentDir);
 
         var result = ContentBuildRunner.Run(options);
 
