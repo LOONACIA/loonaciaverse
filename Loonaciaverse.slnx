@@ -4,10 +4,12 @@
     <Project Path="src/Loonaciaverse.Web/Loonaciaverse.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Loonaciaverse.BudgetCheck.Tests/Loonaciaverse.BudgetCheck.Tests.csproj" />
     <Project Path="tests/Loonaciaverse.ContentBuilder.Tests/Loonaciaverse.ContentBuilder.Tests.csproj" />
     <Project Path="tests/Loonaciaverse.Web.Tests/Loonaciaverse.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
+    <Project Path="tools/Loonaciaverse.BudgetCheck/Loonaciaverse.BudgetCheck.csproj" />
     <Project Path="tools/Loonaciaverse.ContentBuilder/Loonaciaverse.ContentBuilder.csproj" />
   </Folder>
 </Solution>
