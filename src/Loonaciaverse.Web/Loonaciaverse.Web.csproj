@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Loonaciaverse.Core/Loonaciaverse.Core.csproj" />
     <ProjectReference Include="../../tools/Loonaciaverse.ContentBuilder/Loonaciaverse.ContentBuilder.csproj"
                       ReferenceOutputAssembly="false" OutputItemType="_ContentBuilderAssembly"
                       SkipGetTargetFrameworkProperties="true"
