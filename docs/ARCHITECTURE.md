@@ -228,5 +228,6 @@ dotnet run --project tools/Loonaciaverse.BudgetCheck -- artifacts/publish/wwwroo
 1. GitHub 저장소를 만들고 push한다.
 2. Azure Static Web Apps Free 리소스를 만든다. 배포 소스는 **Other**로 골라 Azure가 저장소에 워크플로를 추가하지 않게 한다.
 3. 리소스의 배포 토큰을 GitHub 저장소 secret `AZURE_STATIC_WEB_APPS_API_TOKEN`에 등록한다.
-4. 사용자 지정 도메인으로 루트 도메인(DNS 업체의 ALIAS/ANAME 또는 Azure DNS)과 `www`(CNAME)를 추가한다. 루트 도메인을 기본 도메인으로 지정해 `www`가 루트로 리다이렉트되게 한다. HTTPS 인증서는 SWA가 발급한다.
-5. 배포 후 딥링크 새로고침, 없는 정적 파일의 404, `/content/*`의 `Cache-Control: no-cache`, 공유 미리보기(OG), 브라우저 개발자 도구의 홈 전송량을 확인한다.
+4. 가비아에서 도메인의 네임서버를 Cloudflare(Free)로 바꾼다. 바꾸기 전에 기존 레코드(메일을 쓰면 MX와 SPF·DKIM·DMARC TXT)를 Cloudflare에 옮기고, DNSSEC이 켜져 있으면 끈다.
+5. 사용자 지정 도메인으로 루트 도메인과 `www`를 추가한다. Cloudflare에 SWA가 생성한 TXT 검증 레코드와 `@`·`www`의 CNAME(`<앱>.azurestaticapps.net`)을 넣는다. 루트의 CNAME은 Cloudflare가 flattening한다. CNAME은 프록시 없이 **DNS only**로 둔다. 루트 도메인을 기본 도메인으로 지정해 `www`가 루트로 리다이렉트되게 한다. HTTPS 인증서는 SWA가 발급한다.
+6. 배포 후 딥링크 새로고침, 없는 정적 파일의 404, `/content/*`의 `Cache-Control: no-cache`, 공유 미리보기(OG), 브라우저 개발자 도구의 홈 전송량을 확인한다.

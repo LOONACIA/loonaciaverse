@@ -110,7 +110,7 @@
   - 나중에 C# Azure Functions를 붙이거나 App Service(Web App)로 옮겨도 같은 생태계에 머문다.
 - **트레이드오프**:
   - 무료 플랜 제약이 있다(월 대역폭 100GB, 앱 크기 250MB).
-  - 루트 도메인을 연결하려면 DNS 업체가 ALIAS/ANAME을 지원하거나 Azure DNS를 써야 한다.
+  - 루트 도메인을 연결하려면 DNS가 ALIAS/ANAME이나 CNAME flattening을 지원해야 한다. Azure DNS는 유료라서 네임서버를 Cloudflare(Free)로 옮겨 DNS만 맡긴다(프록시 없이 DNS only).
   - Playground(Unity WebGL)를 도입할 때는 빌드 크기와 압축 파일(`.br`)의 `Content-Encoding` 헤더 처리 때문에 호스팅을 다시 검토해야 한다.
 - **하네스에 미치는 영향**:
   - 다른 호스팅용 설정(GitHub Pages의 `404.html` 우회, Cloudflare `_headers` 등)을 추가하지 마라.
