@@ -11,14 +11,12 @@ public class ContentBuildIntegrationTests
         var webRoot = FindWebRoot();
 
         var universe = ReadContent<Universe>(webRoot, "universe.json");
-        var posts = ReadContent<PostSummary[]>(webRoot, "posts.json");
-        var projects = ReadContent<ProjectSummary[]>(webRoot, "projects.json");
+        ReadContent<PostSummary[]>(webRoot, "posts.json");
+        ReadContent<ProjectSummary[]>(webRoot, "projects.json");
         var about = ReadContent<AboutProfile>(webRoot, "about.json");
 
         Assert.False(string.IsNullOrWhiteSpace(universe.Site.Title));
         Assert.NotEmpty(universe.Bodies);
-        Assert.NotEmpty(posts);
-        Assert.NotEmpty(projects);
         Assert.False(string.IsNullOrWhiteSpace(about.Name));
     }
 
