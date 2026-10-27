@@ -161,7 +161,7 @@ export function warp(bodyId: string): Promise<void>; // 900ms 타이머로 1초 
 export function dispose(): void;
 ```
 - `init`은 이전 씬을 dispose한 뒤 컨테이너 안에 캔버스와 CSS2D 이름표 레이어를 만든다. 렌더러 생성 실패도 `false`로 반환한다. `ResizeObserver`로 크기를 맞추고, `visibilitychange`로 숨겨진 탭의 렌더 루프를 멈춘다.
-- `focus`는 `immediate`가 true이면 즉시, false이면 0.8초 트윈으로 천체에 접근한다. `clearFocus`는 0.8초 트윈으로 전체 구도로 돌아간다. `highlight`는 키보드로 강조할 천체를 지정하며 `null`로 해제한다. 포커스·호버·키보드 강조 중에는 공전을 멈추지만 자전과 셰이더 시간은 계속 흐른다.
+- `focus`는 `immediate`가 true이면 즉시, false이면 0.8초 트윈으로 천체에 접근한다. `clearFocus`는 0.8초 트윈으로 전체 구도로 돌아간다. `highlight`는 키보드로 강조할 천체를 지정하며 `null`로 해제한다. 호버·키보드 강조 중에는 공전을 멈추지만 자전과 셰이더 시간은 계속 흐른다. 포커스 중에는 공전을 멈추지 않고 카메라가 매 프레임 천체를 따라가며, 포커스한 천체를 호버·강조해도 공전을 멈추지 않는다.
 - C# 콜백은 `SceneInterop`의 `[JSInvokable] public Task OnBodyClicked(string? id)` 하나다. `null`은 빈 공간 클릭이며, 이름표 클릭도 같은 콜백으로 전달한다. 호버 콜백은 없고 씬 내부에서만 처리한다.
 - `warp`는 카메라 돌진·별 궤적·배경색 페이드를 실행한다. 완료는 `requestAnimationFrame`에 의존하지 않는 `setTimeout(..., 900)`으로 resolve하므로 렌더 루프가 멈춰도 완료를 기다릴 수 있다. 워프를 시작하면 입력과 포커스·강조 명령을 무시하고 이름표와 링을 숨긴다. 반복 호출은 진행 중인 Promise를 반환하며, 씬이 없거나 id가 유효하지 않으면 즉시 resolve한다.
 - `dispose`는 렌더 루프·이벤트·observer·DOM·GPU 리소스·블룸 패스를 해제하고, 진행 중인 워프 타이머를 취소하며 Promise도 resolve한다. 다시 초기화하거나 여러 번 해제할 수 있다.

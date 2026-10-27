@@ -260,23 +260,39 @@ describe("scene camera", () => {
 });
 
 describe("scene focus and input", () => {
-  it("applies immediate focus, reframes on resize, and tweens back to overview in 0.8 seconds", () => {
+  it("applies immediate focus, follows the orbiting body, reframes on resize, and tweens back to overview in 0.8 seconds", () => {
     const { camera, body } = startScene();
     const position = body.position.clone();
+    const radius = body.geometry.parameters.radius;
     focus("planet", true);
-    expect(camera.position.toArray()).toEqual(Object.values(focusPose(position, body.geometry.parameters.radius, 1.5).position));
+    expect(camera.position.toArray()).toEqual(Object.values(focusPose(position, radius, 1.5).position));
     tick(1000);
-    expect(body.position.equals(position)).toBe(true);
+    expect(body.position.equals(position)).toBe(false);
+    expect(camera.position.toArray()).toEqual(Object.values(focusPose(body.position, radius, 1.5).position));
     Object.defineProperty(container, "clientWidth", { value: 400 });
     resize([], {} as ResizeObserver);
-    expect(camera.position.toArray()).toEqual(Object.values(focusPose(position, body.geometry.parameters.radius, 0.5).position));
+    expect(camera.position.toArray()).toEqual(Object.values(focusPose(body.position, radius, 0.5).position));
     clearFocus();
     tick(1400);
     const overview = overviewPose(17.35, 0.5);
     expect(camera.position.toArray()).not.toEqual(Object.values(overview.position));
     tick(1800);
     expect(camera.position.toArray()).toEqual(Object.values(overview.position));
+  });
+
+  it("keeps orbiting while the pointer rests on the focused body", () => {
+    const { active, camera, body } = startScene();
+    // The pointer stays over the clicked body while the camera moves in.
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { ...bodyScreenPosition(camera, body), pointerType: "mouse" }));
+    focus("planet", true);
+    const position = body.position.clone();
+    tick(1000);
     expect(body.position.equals(position)).toBe(false);
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { ...bodyScreenPosition(camera, body), pointerType: "mouse" }));
+    expect(active.domElement.style.cursor).toBe("pointer");
+    const followed = body.position.clone();
+    tick(2000);
+    expect(body.position.equals(followed)).toBe(false);
   });
 
   it("animates focus from the current pose and ignores unknown focus IDs", () => {

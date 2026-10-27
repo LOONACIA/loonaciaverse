@@ -84,6 +84,11 @@ export class CameraTween {
     if (durationSeconds <= 0) this.pose = this.to;
   }
 
+  // Moves the destination without restarting the transition, for a target that keeps moving.
+  follow(to: Pose): void {
+    this.to = interpolatePose(to, to, 0);
+  }
+
   step(deltaSeconds: number): Pose {
     this.elapsedSeconds += Math.max(0, deltaSeconds);
     const progress = this.durationSeconds <= 0 ? 1 : this.elapsedSeconds / this.durationSeconds;

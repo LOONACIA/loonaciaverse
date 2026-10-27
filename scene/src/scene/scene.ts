@@ -222,9 +222,13 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
     }
     const delta = current.lastTimestamp === null ? 0 : (timestamp - current.lastTimestamp) / 1000;
     current.lastTimestamp = timestamp;
-    system.update(delta, current.warp !== null || shouldPauseOrbits(current.focusedId !== null, current.hoveredId !== null, current.highlightedId !== null));
+    system.update(delta, current.warp !== null || shouldPauseOrbits(current.focusedId, current.hoveredId, current.highlightedId));
     if (current.warp) updateWarp(current, performance.now() - current.warp.startedAt);
-    else applyPose(camera, current.tween.step(delta));
+    else {
+      // The focused body keeps orbiting, so the camera tracks it.
+      if (current.focusedId !== null) current.tween.follow(bodyPose(current, current.focusedId)!);
+      applyPose(camera, current.tween.step(delta));
+    }
     updateDecorations(current, delta);
     if (composer) composer.render(delta);
     else renderer.render(system.scene, camera);

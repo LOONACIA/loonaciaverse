@@ -1,7 +1,8 @@
 import type { BodyDto } from "./types";
 
-export function shouldPauseOrbits(focused: boolean, hovered: boolean, highlighted: boolean): boolean {
-  return focused || hovered || highlighted;
+// Pointing at a body holds it still for clicking. The camera follows the focused body, so it never needs to be held.
+export function shouldPauseOrbits(focusedId: string | null, hoveredId: string | null, highlightedId: string | null): boolean {
+  return [hoveredId, highlightedId].some((id) => id !== null && id !== focusedId);
 }
 
 export function orbitPosition(orbit: BodyDto["orbit"], orbitSeconds: number): { x: number; z: number } {

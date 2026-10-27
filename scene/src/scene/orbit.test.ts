@@ -3,16 +3,19 @@ import { OrbitClock, orbitPosition, shouldPauseOrbits } from "./orbit";
 
 describe("shouldPauseOrbits", () => {
   it.each([
-    [false, false, false, false],
-    [false, false, true, true],
-    [false, true, false, true],
-    [false, true, true, true],
-    [true, false, false, true],
-    [true, false, true, true],
-    [true, true, false, true],
-    [true, true, true, true],
-  ])("focus %s, hover %s, highlight %s pauses: %s", (focused, hovered, highlighted, paused) => {
-    expect(shouldPauseOrbits(focused, hovered, highlighted)).toBe(paused);
+    [null, null, null, false],
+    [null, null, "a", true],
+    [null, "a", null, true],
+    [null, "a", "b", true],
+    ["a", null, null, false],
+    ["a", "a", null, false],
+    ["a", null, "a", false],
+    ["a", "a", "a", false],
+    ["a", "b", null, true],
+    ["a", null, "b", true],
+    ["a", "a", "b", true],
+  ])("focus %s, hover %s, highlight %s pauses: %s", (focusedId, hoveredId, highlightedId, paused) => {
+    expect(shouldPauseOrbits(focusedId, hoveredId, highlightedId)).toBe(paused);
   });
 });
 

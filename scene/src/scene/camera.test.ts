@@ -107,6 +107,16 @@ describe("CameraTween", () => {
     expect(tween.step(0.4)).toEqual(from);
   });
 
+  it("keeps its progress when the destination moves", () => {
+    const tween = new CameraTween(from, from, 0);
+    tween.retarget(to, 0.8);
+    tween.step(0.4);
+    tween.follow(from);
+    expect(tween.step(0)).toEqual(interpolatePose(from, from, 0.5));
+    tween.follow(to);
+    expect(tween.step(0.4)).toEqual(to);
+  });
+
   it("applies immediate poses and can animate again afterwards", () => {
     const tween = new CameraTween(from, from, 0);
     tween.retarget(to, 0);
