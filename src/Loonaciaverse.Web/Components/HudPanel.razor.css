@@ -1,30 +1,12 @@
-/* The callouts have no frame, and the bottom sheet's scrolling clips the corner brackets to nothing but a
-   1px overflow that adds a horizontal scrollbar. */
+/* The callouts have no frame, and the bottom sheet runs edge to edge, which would push the corner brackets
+   off the screen. */
 .hud-panel.hud-frame::before,
 .hud-panel.hud-frame::after {
     content: none;
 }
 
-.hud-close {
-    display: grid;
-    width: 2.75rem;
-    height: 2.75rem;
-    place-items: center;
-    border: 1px solid var(--color-hud-dim);
-    background: var(--color-surface);
-    color: var(--color-hud);
-    font: inherit;
-    cursor: pointer;
-    pointer-events: auto;
-}
-
-.hud-close:hover {
-    border-color: var(--color-hud);
-    background: var(--color-bg);
-}
-
+.hud-back,
 .hud-travel {
-    min-width: 12rem;
     padding: 0.75rem 1.5rem;
     border: 1px solid var(--color-hud-dim);
     background: var(--color-surface);
@@ -37,6 +19,11 @@
     pointer-events: auto;
 }
 
+.hud-travel {
+    min-width: 12rem;
+}
+
+.hud-back:hover,
 .hud-travel:enabled:hover {
     border-color: var(--color-hud);
     background: var(--color-bg);
@@ -190,7 +177,7 @@
         max-height: 22dvh;
     }
 
-    .hud-close {
+    .hud-back {
         position: fixed;
         right: max(2rem, env(safe-area-inset-right));
         bottom: max(2rem, env(safe-area-inset-bottom));
@@ -210,28 +197,35 @@
     }
 }
 
-/* Portrait screens: the body sits near the top, and the HUD is a bottom sheet. */
+/* Portrait screens: the body sits near the top, and the HUD is a bottom sheet. Only the body info scrolls,
+   so the buttons stay in view at the bottom of the sheet. */
 @media (max-aspect-ratio: 1/1) {
     .hud-panel {
         position: absolute;
         right: 0;
         bottom: 0;
         left: 0;
+        display: flex;
+        flex-direction: column;
         max-height: 45dvh;
-        padding: 3.5rem 1.5rem max(1.5rem, env(safe-area-inset-bottom));
-        overflow-y: auto;
-        overscroll-behavior: contain;
         pointer-events: auto;
     }
 
-    .hud-close {
-        position: absolute;
-        top: 0.5rem;
-        right: 0.5rem;
+    .hud-panel ::deep .body-info {
+        padding: 1.5rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .hud-actions {
+        display: flex;
+        gap: 0.75rem;
+        padding: 0.75rem 1.5rem max(0.75rem, env(safe-area-inset-bottom));
+        border-top: 1px solid var(--color-hud-dim);
     }
 
     .hud-travel {
-        width: 100%;
-        margin-top: 1.5rem;
+        flex: 1;
+        min-width: 0;
     }
 }

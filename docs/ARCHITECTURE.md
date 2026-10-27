@@ -142,7 +142,7 @@ index.html(부팅 화면) → Blazor 부팅 → Home 페이지
 - `Home`은 콘텐츠 로드와 페이지 메타데이터를 맡고, `StarSystem`은 씬·HUD·키보드 입력·목록형 fallback을 맡는다. `HudPanel`과 `ListHome`은 `BodyInfo`를 공유하므로 같은 천체 정보와 링크를 보여 준다.
 - `SceneInterop`은 DI에 등록하지 않고 `StarSystem`이 `new SceneInterop(JS)`로 생성한다. 씬 컨테이너와 JS 모듈·`DotNetObjectReference`의 수명을 컴포넌트에 맞추고, 홈을 벗어날 때 이벤트 구독과 씬 리소스를 함께 해제하기 위해서다.
 - `StarSystem`은 현재 URL의 `focus`를 천체 목록과 대조하며, 알 수 없는 값은 `/`로 replace한다. 최초 적용은 `immediate: true`로 직접 진입 시 줌인 트윈을 생략하고, 이후 URL 변경에는 포커스·해제 트윈을 적용한다.
-- OVERVIEW에서 천체를 선택하면 포커스 URL을 push하고 `NavigationOptions.HistoryEntryState`에 `loonaciaverse:home-focus` 마커를 넣는다. 다른 천체로 바꾸면 현재 항목을 replace하며 기존 `HistoryEntryState`를 보존한다. ✕·Esc·빈 공간 클릭으로 닫을 때 현재 항목에 마커가 있으면 `history.back()`을 호출하고, 직접 진입처럼 마커가 없으면 `/`로 replace한다. 브라우저 뒤로가기도 URL 변경을 통해 씬과 HUD에 반영한다.
+- OVERVIEW에서 천체를 선택하면 포커스 URL을 push하고 `NavigationOptions.HistoryEntryState`에 `loonaciaverse:home-focus` 마커를 넣는다. 다른 천체로 바꾸면 현재 항목을 replace하며 기존 `HistoryEntryState`를 보존한다. BACK·Esc·빈 공간 클릭으로 닫을 때 현재 항목에 마커가 있으면 `history.back()`을 호출하고, 직접 진입처럼 마커가 없으면 `/`로 replace한다. 브라우저 뒤로가기도 URL 변경을 통해 씬과 HUD에 반영한다.
 - TRAVEL은 잠기지 않고 라우트가 있는 천체에서만 동작한다. 워프 중에는 HUD를 숨기고 입력과 URL 변경의 반영을 차단하며, 연출이 실패해도 상세 페이지로 이동한다. 목록형 홈은 워프 없이 일반 링크로 이동한다.
 
 **런타임: 상세**

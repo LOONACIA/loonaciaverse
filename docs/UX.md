@@ -74,7 +74,7 @@ OVERVIEW ──선택──▶ FOCUSED(id) ──TRAVEL──▶ WARPING(id) ─
 - OVERVIEW는 `/`, FOCUSED는 `/?focus={id}`다.
 - OVERVIEW → FOCUSED는 history에 push한다. 그래서 뒤로가기를 누르면 HUD가 닫힌다.
 - FOCUSED → 다른 천체 FOCUSED는 replace한다. 그래서 뒤로가기 한 번이면 OVERVIEW로 돌아간다.
-- UI(✕, Esc, 빈 공간 클릭)로 닫을 때:
+- UI(BACK, Esc, 빈 공간 클릭)로 닫을 때:
   - 이 세션에서 push한 포커스면 `history.back()`
   - `/?focus=`로 직접 들어온 경우면 `/`로 replace
 - 알 수 없는 `focus` 값은 `/`로 replace한다.
@@ -84,7 +84,7 @@ OVERVIEW ──선택──▶ FOCUSED(id) ──TRAVEL──▶ WARPING(id) ─
 | 입력 | 동작 |
 |---|---|
 | 클릭·탭(천체) | 그 천체로 FOCUSED |
-| 클릭·탭(빈 공간), Esc, ✕ | 닫기(4.4) |
+| 클릭·탭(빈 공간), Esc, BACK | 닫기(4.4) |
 | 호버(천체) | 이름표 표시, 커서 pointer, 공전 정지(포커스한 천체는 제외) |
 | Tab / Shift+Tab | 천체 버튼 사이 이동. 포커스된 버튼의 천체가 호버처럼 이름표를 띄운다 |
 | ←/→ (FOCUSED 상태) | 이전/다음 천체로 FOCUSED(replace). 양 끝에서 순환한다 |
@@ -101,7 +101,7 @@ HUD가 열리거나 선택한 천체가 바뀌면 키보드 포커스를 HUD 제
 - 각 항목(4.7의 라벨과 값)은 천체 가장자리에서 꺾여 나온 선에 매단다. 라벨은 선 위에, 값은 선 아래에 두고 둘 다 선의 바깥쪽 끝에 맞춘다. 선은 라벨과 값 중 넓은 쪽 끝에서 멈춘다.
 - 항목 순서대로 왼쪽 위, 오른쪽 위, 오른쪽 아래 자리에 놓고, 항목이 셋 이상이면 마지막 항목(대개 카드)을 왼쪽 아래에 놓는다. 잠긴 천체의 `COMING SOON`은 오른쪽 위에 둔다.
 - 콜아웃은 카메라가 도착한 뒤에 나타난다. 그래야 선이 천체에 닿는다.
-- TRAVEL은 하단 중앙, ✕는 오른쪽 아래에 둔다.
+- TRAVEL은 하단 중앙, BACK은 오른쪽 아래에 둔다.
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                            ARCHIVA                               │
@@ -116,10 +116,10 @@ HUD가 열리거나 선택한 천체가 바뀌면 키보드 포커스를 HUD 제
 │     ┌──────────────┐                        UNITY · BLAZOR       │
 │     │ 최신 글 카드   │                                             │
 │     └──────────────┘                                             │
-│                          [   TRAVEL   ]                    [ ✕ ] │
+│                          [   TRAVEL   ]                 [ BACK ] │
 └──────────────────────────────────────────────────────────────────┘
 ```
-**모바일 세로 화면**: 천체를 화면 위쪽 중앙에 두고, HUD는 하단 시트(화면 높이 45% 이내)로 띄운다. 시트 하단에 TRAVEL이 꽉 찬 너비로 있다. 시트 바깥을 탭하면 닫힌다.
+**모바일 세로 화면**: 천체를 화면 위쪽 중앙에 두고, HUD는 하단 시트(화면 높이 45% 이내)로 띄운다. 시트 하단에 BACK과 TRAVEL을 나란히 둔 고정 바가 있고, TRAVEL이 남은 너비를 채운다. 내용이 길면 고정 바 위의 내용만 스크롤된다. 시트 바깥을 탭하면 닫힌다.
 
 ### 4.7 HUD 내용
 모든 수치는 빌드할 때 `universe.json`에 계산되어 들어간다. 초안은 제외한다.
@@ -205,4 +205,4 @@ HUD 라벨은 대문자로 쓰고 `letter-spacing: 0.12em`을 준다.
 탭이 숨겨지면(`visibilitychange`) 렌더 루프를 멈춘다. 목표 프레임은 PRD 제약(데스크톱 60fps, 중급 모바일 30fps)이다.
 
 ## 10. HUD 카피
-`SELECT DESTINATION`, `TRAVEL`, `CLOSE`, `COMING SOON`, `SIGNAL UNCONFIRMED`, `NAVIGATION SYSTEM BOOT`, `LOST IN SPACE`, `RETURN TO ORBIT`, `SIGNAL LOST`, `RETRY`, `POSTS`, `LAST TRANSMISSION`, `TOP TAGS`, `LATEST`, `PROJECTS`, `PRIMARY STACK`, `FEATURED`, `CLASS`, `COMMS`, `STATUS`, `CONTENTS`, `PUBLISHED`, `UPDATED`, `PERIOD`, `ROLE`, `STACK`, `LINKS`, `DRAFT`, `ALL POSTS`, `TAG`
+`SELECT DESTINATION`, `TRAVEL`, `BACK`, `COMING SOON`, `SIGNAL UNCONFIRMED`, `NAVIGATION SYSTEM BOOT`, `LOST IN SPACE`, `RETURN TO ORBIT`, `SIGNAL LOST`, `RETRY`, `POSTS`, `LAST TRANSMISSION`, `TOP TAGS`, `LATEST`, `PROJECTS`, `PRIMARY STACK`, `FEATURED`, `CLASS`, `COMMS`, `STATUS`, `CONTENTS`, `PUBLISHED`, `UPDATED`, `PERIOD`, `ROLE`, `STACK`, `LINKS`, `DRAFT`, `ALL POSTS`, `TAG`

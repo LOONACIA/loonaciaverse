@@ -1,7 +1,9 @@
 <section class="hud-panel hud-frame" aria-label="@($"{Body.Name} — {Body.Subtitle}")">
-    <button class="hud-close" type="button" aria-label="CLOSE" @onclick="OnClose">✕</button>
     <BodyInfo Body="Body" Stats="Stats" @ref="bodyInfo" />
-    <button class="hud-travel" type="button" disabled="@(Body.Locked || Body.Route is null)" @onclick="OnTravel">TRAVEL</button>
+    <div class="hud-actions">
+        <button class="hud-back" type="button" @onclick="OnClose">BACK</button>
+        <button class="hud-travel" type="button" disabled="@(Body.Locked || Body.Route is null)" @onclick="OnTravel">TRAVEL</button>
+    </div>
 </section>
 
 @code {

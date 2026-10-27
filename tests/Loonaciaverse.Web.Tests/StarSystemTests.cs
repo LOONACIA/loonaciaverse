@@ -299,7 +299,7 @@ public class StarSystemTests
 
         if (closeButton)
         {
-            component.Find("button[aria-label='CLOSE']").Click();
+            component.Find("button.hud-back").Click();
         }
         else
         {
@@ -333,7 +333,7 @@ public class StarSystemTests
         navigation.NavigateTo("/?focus=blog", new NavigationOptions { HistoryEntryState = marker });
 
         var recreated = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
-        recreated.Find("button[aria-label='CLOSE']").Click();
+        recreated.Find("button.hud-back").Click();
 
         context.JSInterop.VerifyInvoke("history.back", 1);
         Assert.Equal(new object?[] { "blog", true }, module.VerifyInvoke("focus", 2).Last().Arguments);
@@ -352,7 +352,7 @@ public class StarSystemTests
 
         if (closeButton)
         {
-            component.Find("button[aria-label='CLOSE']").Click();
+            component.Find("button.hud-back").Click();
         }
         else
         {
@@ -545,7 +545,7 @@ public class StarSystemTests
         Assert.Equal("blog", component.FindComponent<HudPanel>().Instance.Body.Id);
         await ClickBodyAsync(component, module, "projects");
         Assert.Equal("projects", component.FindComponent<HudPanel>().Instance.Body.Id);
-        component.Find("button[aria-label='CLOSE']").Click();
+        component.Find("button.hud-back").Click();
 
         Assert.Equal("/", navigation.History.First().Uri);
         Assert.Empty(component.FindComponents<HudPanel>());
@@ -932,7 +932,7 @@ public class StarSystemTests
         component.Render();
         VerifyLastFocus(context, heading, 2);
 
-        component.Find("button[aria-label='CLOSE']").Click();
+        component.Find("button.hud-back").Click();
         VerifyLastFocus(context, root, 3);
         component.Render();
         VerifyLastFocus(context, root, 3);
