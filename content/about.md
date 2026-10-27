@@ -2,7 +2,7 @@
 name: LOONACIA
 title: Game & .NET Developer
 stack: [csharp, dotnet, unity]
-email: you@example.com
+email: hello.world@loonacia.dev
 github: https://github.com/LOONACIA
 linkedin: https://www.linkedin.com/in/loonacia
 ---
