@@ -7,7 +7,7 @@
     {
         <div class="scene-host" @ref="host"></div>
     }
-    <div class="hud-layer" hidden="@(state == SceneState.Warping)">
+    <div class="hud-layer @(state == SceneState.Ready && FocusedBody is not null ? "hud-open" : "")" hidden="@(state == SceneState.Warping)">
         <header class="home-header">
             <h1>@Universe.Site.Title</h1>
             <p class="hud-label">SELECT DESTINATION</p>

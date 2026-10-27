@@ -31,6 +31,13 @@ h1 {
     margin: 0.75rem 0 0;
 }
 
+/* On wide screens the HUD shows the focused body's name in the header's place. */
+@media not all and (max-aspect-ratio: 1/1) {
+    .hud-open .home-header {
+        opacity: 0;
+    }
+}
+
 .list-fallback {
     width: min(100%, 46rem);
     margin-inline: auto;

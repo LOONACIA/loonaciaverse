@@ -17,7 +17,7 @@ loonaciaverse/
 │     ├─ Pages/                      # 라우트 컴포넌트 (Home, BlogList, BlogPost, ProjectList, ProjectDetail, About, NotFound)
 │     ├─ Components/
 │     │  ├─ StarSystem.razor         # 씬 수명주기, URL 포커스, 키보드 입력, HUD·목록형 홈 전환
-│     │  ├─ HudPanel.razor           # HUD 패널, 닫기·TRAVEL 버튼
+│     │  ├─ HudPanel.razor           # HUD(데스크톱 콜아웃, 모바일 하단 시트), 닫기·TRAVEL 버튼
 │     │  ├─ BodyInfo.razor           # HUD와 목록형 홈이 공유하는 천체 정보
 │     │  ├─ ListHome.razor           # 씬을 쓸 수 없을 때의 카드 목록
 │     │  └─ ...                      # 상단 바, 콘텐츠 카드 등
@@ -75,7 +75,7 @@ loonaciaverse/
 - 서비스 등록은 `Program`의 정적 메서드 `ConfigureServices` 한 곳에 모은다. 이유: BlazorWasmPreRendering.Build가 이 형태를 요구한다. 도입할 때 README에서 정확한 시그니처를 확인한다.
 - Three.js 코드는 `scene/`에만 있다. C# 쪽은 `SceneInterop` 하나만 씬 모듈을 import하고 호출한다. 페이지가 `IJSRuntime`으로 씬 함수를 직접 부르지 않는다.
 - HUD는 Blazor가 그린다. 예외로 천체 이름표는 매 프레임 3D 위치를 따라가야 하므로 씬 모듈이 CSS2DRenderer로 관리한다(ADR-003).
-- "어떤 천체가 선택됐는가"의 유일한 원천은 URL(`?focus=`)이고, 이를 홈의 `StarSystem` 컴포넌트가 해석해 씬에 명령한다. 씬은 렌더링에 필요한 포커스·호버·강조·애니메이션 상태를 보관하며, C#에는 클릭만 알린다. 호버와 그에 따른 이름표 강조·공전 정지는 씬 내부에서 처리한다.
+- "어떤 천체가 선택됐는가"의 유일한 원천은 URL(`?focus=`)이고, 이를 홈의 `StarSystem` 컴포넌트가 해석해 씬에 명령한다. 씬은 렌더링에 필요한 포커스·호버·강조·애니메이션 상태를 보관하며, C#에는 클릭만 알린다. 호버와 그에 따른 이름표 표시·공전 정지는 씬 내부에서 처리한다.
 
 ## 콘텐츠 모델 (Core)
 초안이며 구현하면서 조정할 수 있다. 바뀌면 이 절을 고친다.

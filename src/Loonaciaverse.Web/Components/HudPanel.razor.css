@@ -1,21 +1,11 @@
-.hud-panel {
-    position: absolute;
-    top: 9rem;
-    bottom: 2rem;
-    left: 2rem;
-    width: min(24rem, 40vw);
-    height: fit-content;
-    max-height: calc(100dvh - 11rem);
-    padding: 3.5rem 1.5rem 1.5rem;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    pointer-events: auto;
+/* The callouts have no frame, and the bottom sheet's scrolling clips the corner brackets to nothing but a
+   1px overflow that adds a horizontal scrollbar. */
+.hud-panel.hud-frame::before,
+.hud-panel.hud-frame::after {
+    content: none;
 }
 
 .hud-close {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
     display: grid;
     width: 2.75rem;
     height: 2.75rem;
@@ -25,6 +15,7 @@
     color: var(--color-hud);
     font: inherit;
     cursor: pointer;
+    pointer-events: auto;
 }
 
 .hud-close:hover {
@@ -33,10 +24,6 @@
 }
 
 .hud-travel {
-    position: fixed;
-    bottom: max(2rem, env(safe-area-inset-bottom));
-    left: 50%;
-    transform: translateX(-50%);
     min-width: 12rem;
     padding: 0.75rem 1.5rem;
     border: 1px solid var(--color-hud-dim);
@@ -47,6 +34,7 @@
     font-weight: 600;
     letter-spacing: 0.12em;
     cursor: pointer;
+    pointer-events: auto;
 }
 
 .hud-travel:enabled:hover {
@@ -60,22 +48,190 @@
     cursor: default;
 }
 
-@media (max-aspect-ratio: 1/1) {
+/* Wide screens: focusPose centers the body, and each item becomes a callout wired to its edge. */
+@media not all and (max-aspect-ratio: 1/1) {
     .hud-panel {
-        top: auto;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        max-height: 45dvh;
-        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+        /* The body's on-screen radius as framed by focusPose in scene/src/scene/camera.ts. */
+        --body-radius: min(20dvh, 11.5vw);
+        --callout-inset: calc(50% + var(--body-radius) * 2);
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        /* Other bodies may drift behind the callouts. */
+        text-shadow:
+            0 0 0.15rem var(--color-bg),
+            0 0 0.4rem var(--color-bg),
+            0 0 0.8rem var(--color-bg),
+            0 0 1.5rem var(--color-bg);
+    }
+
+    .hud-panel.hud-frame {
+        border: 0;
+        background: none;
+    }
+
+    /* The body's name replaces the site title at the top center. */
+    .hud-panel ::deep header {
+        position: absolute;
+        top: 3rem;
+        left: 50%;
+        width: min(40rem, calc(100% - 2rem));
+        transform: translateX(-50%);
+        text-align: center;
+    }
+
+    /* Appear once the camera has arrived (0.8 s), so the lines meet the body. Each body renders its own
+       list, so this replays when the focus moves to another body. */
+    .hud-panel ::deep :is(dl, .body-coming-soon) {
+        animation: hud-callouts-in 0.4s ease-out 0.6s both;
+    }
+
+    /* Each label sits on its line and the value hangs below it, both at the outer end of the line. The line
+       runs only as far as the wider of the two, so the callout fits its content. */
+    .hud-panel ::deep :is(.body-item, .body-coming-soon) {
+        --label-height: 1.75rem;
+        position: absolute;
+        top: calc(50% + var(--slot-y) * var(--body-radius) - var(--label-height));
+        left: var(--callout-inset);
+        width: max-content;
+        max-width: min(17rem, calc(50% - var(--body-radius) * 2 - 2rem));
+        margin: 0;
+        text-align: right;
+        pointer-events: auto;
+    }
+
+    .hud-panel ::deep :is(dt, .body-coming-soon) {
+        margin: 0;
+        padding: 0 0.5rem 0.25rem;
+        border-bottom: 1px solid var(--color-hud);
+        line-height: 1.5rem;
+        white-space: nowrap;
+    }
+
+    .hud-panel ::deep dd {
+        margin: 0;
+        padding: 0.4rem 0.5rem 0;
+    }
+
+    .hud-panel ::deep .body-item :is(.body-stack, .body-comms) {
+        justify-content: flex-end;
+    }
+
+    /* Slots: upper left, upper right, lower right, and the last of three or more items at the lower left. */
+    .hud-panel ::deep .body-item:nth-of-type(1) {
+        --slot-y: -0.75;
+        --slot-angle: 30deg;
+    }
+
+    .hud-panel ::deep .body-item:nth-of-type(2),
+    .hud-panel ::deep .body-coming-soon {
+        --slot-y: -0.75;
+        --slot-angle: 150deg;
+    }
+
+    .hud-panel ::deep .body-item:nth-of-type(3) {
+        --slot-y: 0.75;
+        --slot-angle: -150deg;
+    }
+
+    .hud-panel ::deep .body-item:nth-of-type(n + 3):last-of-type {
+        --slot-y: 0.75;
+        --slot-angle: -30deg;
+    }
+
+    .hud-panel ::deep .body-item:is(:nth-of-type(1), :nth-of-type(n + 3):last-of-type) {
+        right: var(--callout-inset);
+        left: auto;
+        text-align: left;
+    }
+
+    .hud-panel ::deep .body-item:is(:nth-of-type(1), :nth-of-type(n + 3):last-of-type) :is(.body-stack, .body-comms) {
+        justify-content: flex-start;
+    }
+
+    /* An elbow wires each line to the body's edge: a horizontal stub, then a radial diagonal. */
+    .hud-panel ::deep :is(.body-item, .body-coming-soon)::before,
+    .hud-panel ::deep :is(.body-item, .body-coming-soon)::after {
+        position: absolute;
+        top: var(--label-height);
+        height: 1px;
+        background: var(--color-hud);
+        content: "";
+        pointer-events: none;
+    }
+
+    .hud-panel ::deep :is(.body-item, .body-coming-soon)::before {
+        right: 100%;
+        width: calc(var(--body-radius) * 0.7);
+    }
+
+    .hud-panel ::deep :is(.body-item, .body-coming-soon)::after {
+        left: calc(var(--body-radius) * -0.7);
+        width: calc(var(--body-radius) * 0.5);
+        transform: rotate(var(--slot-angle));
+        transform-origin: 0 50%;
+    }
+
+    .hud-panel ::deep .body-item:is(:nth-of-type(1), :nth-of-type(n + 3):last-of-type)::before {
+        right: auto;
+        left: 100%;
+    }
+
+    .hud-panel ::deep .body-item:is(:nth-of-type(1), :nth-of-type(n + 3):last-of-type)::after {
+        left: calc(100% + var(--body-radius) * 0.7);
+    }
+
+    .hud-panel ::deep .body-card {
+        background: var(--color-surface);
+        text-align: left;
+    }
+
+    .hud-panel ::deep .body-card img {
+        max-height: 22dvh;
+    }
+
+    .hud-close {
+        position: fixed;
+        right: max(2rem, env(safe-area-inset-right));
+        bottom: max(2rem, env(safe-area-inset-bottom));
     }
 
     .hud-travel {
-        position: static;
-        transform: none;
+        position: fixed;
+        bottom: max(2rem, env(safe-area-inset-bottom));
+        left: 50%;
+        transform: translateX(-50%);
+    }
+}
+
+@keyframes hud-callouts-in {
+    from {
+        opacity: 0;
+    }
+}
+
+/* Portrait screens: the body sits near the top, and the HUD is a bottom sheet. */
+@media (max-aspect-ratio: 1/1) {
+    .hud-panel {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        max-height: 45dvh;
+        padding: 3.5rem 1.5rem max(1.5rem, env(safe-area-inset-bottom));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        pointer-events: auto;
+    }
+
+    .hud-close {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+    }
+
+    .hud-travel {
         width: 100%;
-        min-width: 0;
         margin-top: 1.5rem;
     }
 }

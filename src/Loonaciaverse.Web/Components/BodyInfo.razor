@@ -7,119 +7,141 @@
     @if (Body.Locked)
     {
         <dl>
-            <dt class="hud-label">STATUS</dt>
-            <dd class="body-status">SIGNAL UNCONFIRMED</dd>
+            <div class="body-item">
+                <dt class="hud-label">STATUS</dt>
+                <dd class="body-status">SIGNAL UNCONFIRMED</dd>
+            </div>
         </dl>
         <p class="hud-label body-coming-soon">COMING SOON</p>
     }
     else if (Body.Id == "about")
     {
         <dl>
-            <dt class="hud-label">CLASS</dt>
-            <dd>@Stats.About.Title</dd>
-            <dt class="hud-label">PRIMARY STACK</dt>
-            <dd>
-                <ul class="body-stack">
-                    @foreach (var stack in Stats.About.Stack)
-                    {
-                        <li class="chip">@stack</li>
-                    }
-                </ul>
-            </dd>
-            <dt class="hud-label">COMMS</dt>
-            <dd>
-                <ul class="body-comms">
-                    <li>
-                        <a href="mailto:@Stats.About.Email" aria-label="EMAIL">
-                            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <rect x="3" y="5" width="18" height="14" rx="1" />
-                                <path d="m3 6 9 7 9-7" />
-                            </svg>
-                        </a>
-                    </li>
-                    @if (Stats.About.Github is { } github)
-                    {
+            <div class="body-item">
+                <dt class="hud-label">CLASS</dt>
+                <dd>@Stats.About.Title</dd>
+            </div>
+            <div class="body-item">
+                <dt class="hud-label">PRIMARY STACK</dt>
+                <dd>
+                    <ul class="body-stack">
+                        @foreach (var stack in Stats.About.Stack)
+                        {
+                            <li class="chip">@stack</li>
+                        }
+                    </ul>
+                </dd>
+            </div>
+            <div class="body-item">
+                <dt class="hud-label">COMMS</dt>
+                <dd>
+                    <ul class="body-comms">
                         <li>
-                            <a href="@github" aria-label="GITHUB" target="_blank" rel="noopener noreferrer">
-                                <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-                                    <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.86c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.76c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
+                            <a href="mailto:@Stats.About.Email" aria-label="EMAIL">
+                                <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="3" y="5" width="18" height="14" rx="1" />
+                                    <path d="m3 6 9 7 9-7" />
                                 </svg>
                             </a>
                         </li>
-                    }
-                    @if (Stats.About.Linkedin is { } linkedin)
-                    {
-                        <li>
-                            <a href="@linkedin" aria-label="LINKEDIN" target="_blank" rel="noopener noreferrer">
-                                <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-                                    <path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM3.5 9h3v12h-3ZM9 9h3v1.6c.6-1.1 1.8-1.9 3.4-1.9 3.2 0 4.6 2 4.6 5.4V21h-3v-6.3c0-2-.6-3.1-2.2-3.1-1.8 0-2.8 1.3-2.8 3.1V21H9Z" />
-                                </svg>
-                            </a>
-                        </li>
-                    }
-                </ul>
-            </dd>
+                        @if (Stats.About.Github is { } github)
+                        {
+                            <li>
+                                <a href="@github" aria-label="GITHUB" target="_blank" rel="noopener noreferrer">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                                        <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.86c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.64-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.76c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" />
+                                    </svg>
+                                </a>
+                            </li>
+                        }
+                        @if (Stats.About.Linkedin is { } linkedin)
+                        {
+                            <li>
+                                <a href="@linkedin" aria-label="LINKEDIN" target="_blank" rel="noopener noreferrer">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+                                        <path d="M5 3a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM3.5 9h3v12h-3ZM9 9h3v1.6c.6-1.1 1.8-1.9 3.4-1.9 3.2 0 4.6 2 4.6 5.4V21h-3v-6.3c0-2-.6-3.1-2.2-3.1-1.8 0-2.8 1.3-2.8 3.1V21H9Z" />
+                                    </svg>
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </dd>
+            </div>
         </dl>
     }
     else if (Body.Id == "projects")
     {
         <dl>
-            <dt class="hud-label">PROJECTS</dt>
-            <dd class="body-metric">@Stats.Projects.ProjectCount</dd>
-            <dt class="hud-label">PRIMARY STACK</dt>
-            <dd>
-                <ul class="body-stack">
-                    @foreach (var stack in Stats.Projects.TopStack)
-                    {
-                        <li class="chip">@stack</li>
-                    }
-                </ul>
-            </dd>
+            <div class="body-item">
+                <dt class="hud-label">PROJECTS</dt>
+                <dd class="body-metric">@Stats.Projects.ProjectCount</dd>
+            </div>
+            <div class="body-item">
+                <dt class="hud-label">PRIMARY STACK</dt>
+                <dd>
+                    <ul class="body-stack">
+                        @foreach (var stack in Stats.Projects.TopStack)
+                        {
+                            <li class="chip">@stack</li>
+                        }
+                    </ul>
+                </dd>
+            </div>
             @if (Stats.Projects.Featured is { } featured)
             {
-                <dt class="hud-label">FEATURED</dt>
-                <dd>
-                    <a class="body-card body-featured" href="/projects/@featured.Slug">
-                        @if (featured.Thumbnail is { } thumbnail)
-                        {
-                            <img src="@thumbnail" alt="" loading="lazy" />
-                        }
-                        <div class="body-card-content">
-                            @if (featured.Draft)
+                <div class="body-item">
+                    <dt class="hud-label">FEATURED</dt>
+                    <dd>
+                        <a class="body-card body-featured" href="/projects/@featured.Slug">
+                            @if (featured.Thumbnail is { } thumbnail)
                             {
-                                <span class="badge badge-draft">DRAFT</span>
+                                <img src="@thumbnail" alt="" loading="lazy" />
                             }
-                            <h3>@featured.Title</h3>
-                        </div>
-                    </a>
-                </dd>
+                            <div class="body-card-content">
+                                @if (featured.Draft)
+                                {
+                                    <span class="badge badge-draft">DRAFT</span>
+                                }
+                                <h3>@featured.Title</h3>
+                            </div>
+                        </a>
+                    </dd>
+                </div>
             }
         </dl>
     }
     else if (Body.Id == "blog")
     {
         <dl>
-            <dt class="hud-label">POSTS</dt>
-            <dd class="body-metric">@Stats.Blog.PostCount</dd>
-            <dt class="hud-label">LAST TRANSMISSION</dt>
-            <dd class="body-metric">@(Stats.Blog.LastPublished is { } date ? Formatting.FormatDate(date) : "—")</dd>
-            <dt class="hud-label">TOP TAGS</dt>
-            <dd>@string.Join(" · ", Stats.Blog.TopTags)</dd>
+            <div class="body-item">
+                <dt class="hud-label">POSTS</dt>
+                <dd class="body-metric">@Stats.Blog.PostCount</dd>
+            </div>
+            <div class="body-item">
+                <dt class="hud-label">LAST TRANSMISSION</dt>
+                <dd class="body-metric">@(Stats.Blog.LastPublished is { } date ? Formatting.FormatDate(date) : "—")</dd>
+            </div>
+            <div class="body-item">
+                <dt class="hud-label">TOP TAGS</dt>
+                <dd>@string.Join(" · ", Stats.Blog.TopTags)</dd>
+            </div>
             @if (Stats.Blog.Latest is { } latest)
             {
-                <dt class="hud-label">LATEST</dt>
-                <dd>
-                    <a class="body-card body-latest" href="/blog/@latest.Slug">
-                        <div class="body-card-content">
-                            @if (latest.Draft)
-                            {
-                                <span class="badge badge-draft">DRAFT</span>
-                            }
-                            <h3>@latest.Title</h3>
-                            <p>@latest.Summary</p>
-                        </div>
-                    </a>
-                </dd>
+                <div class="body-item">
+                    <dt class="hud-label">LATEST</dt>
+                    <dd>
+                        <a class="body-card body-latest" href="/blog/@latest.Slug">
+                            <div class="body-card-content">
+                                @if (latest.Draft)
+                                {
+                                    <span class="badge badge-draft">DRAFT</span>
+                                }
+                                <h3>@latest.Title</h3>
+                                <p>@latest.Summary</p>
+                            </div>
+                        </a>
+                    </dd>
+                </div>
             }
         </dl>
     }

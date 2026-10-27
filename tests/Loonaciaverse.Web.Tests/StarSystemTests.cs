@@ -235,6 +235,7 @@ public class StarSystemTests
         var navigation = Navigation(context);
         var component = context.Render<StarSystem>(parameters => parameters.Add(p => p.Universe, TestContent.Universe()));
         Assert.Empty(component.FindComponents<HudPanel>());
+        Assert.False(component.Find(".hud-layer").ClassList.Contains("hud-open"));
 
         await ClickBodyAsync(component, module, "blog");
 
@@ -245,6 +246,7 @@ public class StarSystemTests
         Assert.False(string.IsNullOrEmpty(marker));
         Assert.Equal(marker, navigation.HistoryEntryState);
         Assert.Equal("blog", component.FindComponent<HudPanel>().Instance.Body.Id);
+        Assert.True(component.Find(".hud-layer").ClassList.Contains("hud-open"));
         var focused = Assert.Single(module.VerifyInvoke("focus", 1));
         Assert.Equal(new object?[] { "blog", false }, focused.Arguments);
 

@@ -3,9 +3,9 @@ import type { Mesh, PerspectiveCamera, SphereGeometry } from "three";
 import { CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import type { BodyDto } from "./types";
 
-export function labelState(bodyId: string, focusedId: string | null, emphasizedId: string | null): "hidden" | "normal" | "emphasized" {
-  if (bodyId === focusedId) return "hidden";
-  return bodyId === emphasizedId ? "emphasized" : "normal";
+// Labels appear only for the hovered or keyboard-highlighted body; the focused body's name is in the HUD.
+export function isLabelVisible(bodyId: string, focusedId: string | null, emphasizedId: string | null): boolean {
+  return bodyId !== focusedId && bodyId === emphasizedId;
 }
 
 export function createBodyLabel(body: Pick<BodyDto, "id" | "name" | "subtitle">, onClick: (id: string) => void, onHover: (id: string | null) => void) {
@@ -37,11 +37,9 @@ export function createBodyLabel(body: Pick<BodyDto, "id" | "name" | "subtitle">,
   return {
     object,
     update(mesh: Mesh<SphereGeometry>, camera: PerspectiveCamera, focusedId: string | null, emphasizedId: string | null, warping: boolean): void {
-      const appearance = labelState(body.id, focusedId, emphasizedId);
-      object.visible = !warping && appearance !== "hidden";
+      object.visible = !warping && isLabelVisible(body.id, focusedId, emphasizedId);
       // Hide immediately too, including while the render loop is suspended.
       if (!object.visible) element.style.display = "none";
-      element.classList.toggle("is-emphasized", appearance === "emphasized");
       // Offset along camera-right, independently of the body's axial rotation.
       // Right-hand bodies put their label on the left to stay inside the viewport.
       const side = projected.copy(mesh.position).project(camera).x > 0.45 ? -1 : 1;

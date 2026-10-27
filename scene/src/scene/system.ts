@@ -9,8 +9,8 @@ import { OrbitClock, orbitPosition } from "./orbit";
 import { DESKTOP_STAR_COUNT } from "./quality";
 import type { UniverseDto } from "./types";
 
-const STAR_RADIUS = 2;
-const PLANET_RADIUS = 0.9;
+const STAR_RADIUS = 3;
+const PLANET_RADIUS = 1.35;
 const SPIN_RADIANS_PER_SECOND = 0.12;
 // Gas giants lean, so the fixed camera sees their equatorial ring as a tilted ellipse.
 const RINGED_AXIAL_TILT = 0.4;
@@ -39,7 +39,8 @@ export function createSystem(universe: UniverseDto, starCount = DESKTOP_STAR_COU
     if (isStar) {
       const corona = createCoronaMaterial(body.visual);
       animatedMaterials.push(corona);
-      mesh.add(new Mesh(new PlaneGeometry(STAR_RADIUS * 6, STAR_RADIUS * 6), corona));
+      // The glow fades out at twice the star's radius.
+      mesh.add(new Mesh(new PlaneGeometry(STAR_RADIUS * 4, STAR_RADIUS * 4), corona));
     } else {
       mesh.add(new Mesh(new SphereGeometry(PLANET_RADIUS * 1.08, 48, 32), createAtmosphereMaterial(body.visual)));
     }

@@ -142,7 +142,7 @@ describe("scene lifecycle", () => {
     expect(camera.aspect).toBe(0.5);
     expect(active.setSize).toHaveBeenLastCalledWith(400, 800);
     const horizontalHalfFov = Math.atan(Math.tan(camera.fov * Math.PI / 360) * camera.aspect);
-    expect(camera.position.length() * Math.sin(horizontalHalfFov)).toBeGreaterThan(16.9);
+    expect(camera.position.length() * Math.sin(horizontalHalfFov)).toBeGreaterThan(17.35);
     expect(callbacks.invokeMethodAsync).not.toHaveBeenCalled();
   });
 
@@ -241,6 +241,7 @@ describe("scene render quality", () => {
     expect((scene.children.find((child) => child instanceof Points) as Points).geometry.getAttribute("position").count).toBe(4000);
     const streaks = scene.children.find((child) => child instanceof LineSegments) as LineSegments;
     expect(streaks.geometry.getAttribute("position").count).toBe(8000);
+    highlight("planet");
     expect(container.querySelector(".scene-label")).not.toBeNull();
   });
 });
@@ -271,7 +272,7 @@ describe("scene focus and input", () => {
     expect(camera.position.toArray()).toEqual(Object.values(focusPose(position, body.geometry.parameters.radius, 0.5).position));
     clearFocus();
     tick(1400);
-    const overview = overviewPose(16.9, 0.5);
+    const overview = overviewPose(17.35, 0.5);
     expect(camera.position.toArray()).not.toEqual(Object.values(overview.position));
     tick(1800);
     expect(camera.position.toArray()).toEqual(Object.values(overview.position));
@@ -501,6 +502,7 @@ describe("scene decorations", () => {
   it("creates a label layer above the canvas, resizes it and disposes its DOM and ring resources", () => {
     const { scene } = startScene();
     const layer = container.querySelector<HTMLElement>(".scene-label-layer")!;
+    highlight("planet");
     const label = layer.querySelector<HTMLElement>(".scene-label")!;
     expect(container.children[1]).toBe(layer);
     expect(layer.style.pointerEvents).toBe("none");
@@ -524,22 +526,27 @@ describe("scene decorations", () => {
 
   it("shares label clicks and hover with body input, and hides the focused label and warp decorations", async () => {
     const { body, scene, camera, active } = startScene();
-    const label = container.querySelector<HTMLElement>(".scene-label")!;
+    // Hidden labels are attached to the layer only once they first appear.
+    expect(container.querySelector(".scene-label")).toBeNull();
     const initial = body.position.clone();
+    active.domElement.dispatchEvent(new PointerEvent("pointermove", { ...bodyScreenPosition(camera, body), pointerType: "mouse" }));
+    const label = container.querySelector<HTMLElement>(".scene-label")!;
+    expect(label.style.display).toBe("");
     const transform = label.style.transform;
     label.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
-    expect(label.classList.contains("is-emphasized")).toBe(true);
     tick(1000);
     expect(body.position.equals(initial)).toBe(true);
     label.dispatchEvent(new PointerEvent("pointerleave"));
+    expect(label.style.display).toBe("none");
     tick(2000);
     expect(body.position.equals(initial)).toBe(false);
-    expect(label.style.transform).not.toBe(transform);
     highlight("planet");
-    expect(label.classList.contains("is-emphasized")).toBe(true);
+    expect(label.style.display).toBe("");
+    expect(label.style.transform).not.toBe(transform);
     highlight(null);
-    active.domElement.dispatchEvent(new PointerEvent("pointermove", { ...bodyScreenPosition(camera, body), pointerType: "mouse" }));
-    expect(label.classList.contains("is-emphasized")).toBe(true);
+    expect(label.style.display).toBe("none");
+    label.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+    expect(label.style.display).toBe("");
     label.click();
     expect(callbacks.invokeMethodAsync).toHaveBeenLastCalledWith("OnBodyClicked", "planet");
     focus("planet", true);

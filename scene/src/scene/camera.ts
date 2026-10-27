@@ -19,18 +19,29 @@ function positionFrom(target: Vector3, distance: number): Vector3 {
 }
 
 export function overviewPose(systemRadius: number, aspect: number): Pose {
-  const horizontalHalfFov = Math.atan(Math.tan(HALF_FOV) * aspect);
-  const distance = systemRadius * 1.1 / Math.sin(Math.min(HALF_FOV, horizontalHalfFov));
+  // Fit the orbital disc as the oblique camera sees it, not its bounding sphere.
+  const radius = systemRadius * 1.1;
+  const tangent = Math.tan(HALF_FOV);
+  // The disc's near edge sits lowest on screen, and its widest point leans toward the camera.
+  const distance = radius * Math.max(BACK.z + BACK.y / tangent, Math.hypot(1 / (tangent * aspect), BACK.z));
   const target = { x: 0, y: 0, z: 0 };
   return { position: positionFrom(target, distance), target };
 }
 
+// On wide screens the focused body sits at the center with this on-screen radius, as a fraction of the
+// viewport height. HudPanel.razor.css mirrors it as min(20dvh, 11.5vw) to draw its callouts around the body.
+function focusScreenRadius(aspect: number): number {
+  return Math.min(0.2, 0.115 * aspect);
+}
+
 export function focusPose(bodyPosition: Vector3, bodyRadius: number, aspect: number): Pose {
-  const distance = bodyRadius * 6 * Math.max(1, 1 / aspect);
+  if (aspect > 1) {
+    const distance = bodyRadius / Math.sin(Math.atan(2 * focusScreenRadius(aspect) * Math.tan(HALF_FOV)));
+    return { position: positionFrom(bodyPosition, distance), target: { ...bodyPosition } };
+  }
+  const distance = bodyRadius * 6 / aspect;
   const halfHeight = distance * Math.tan(HALF_FOV);
-  const target = aspect > 1
-    ? { x: bodyPosition.x - halfHeight * aspect * 0.3, y: bodyPosition.y, z: bodyPosition.z }
-    : { x: bodyPosition.x, y: bodyPosition.y - UP.y * halfHeight * 0.4, z: bodyPosition.z - UP.z * halfHeight * 0.4 };
+  const target = { x: bodyPosition.x, y: bodyPosition.y - UP.y * halfHeight * 0.4, z: bodyPosition.z - UP.z * halfHeight * 0.4 };
   return { position: positionFrom(target, distance), target };
 }
 

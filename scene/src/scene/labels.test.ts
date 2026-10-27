@@ -1,22 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 import { Mesh, MeshBasicMaterial, PerspectiveCamera, SphereGeometry } from "three";
-import { createBodyLabel, labelState } from "./labels";
+import { createBodyLabel, isLabelVisible } from "./labels";
 
 const body = { id: "blog", name: "ARCHIVA", subtitle: "BLOG" };
 
-describe("label state", () => {
+describe("label visibility", () => {
   it.each([
-    [null, null, "normal"],
-    [null, "blog", "emphasized"],
-    [null, "other", "normal"],
-    ["blog", null, "hidden"],
-    ["blog", "blog", "hidden"],
-    ["blog", "other", "hidden"],
-    ["other", null, "normal"],
-    ["other", "blog", "emphasized"],
-    ["other", "other", "normal"],
+    [null, null, false],
+    [null, "blog", true],
+    [null, "other", false],
+    ["blog", null, false],
+    ["blog", "blog", false],
+    ["blog", "other", false],
+    ["other", null, false],
+    ["other", "blog", true],
+    ["other", "other", false],
   ] as const)("focus %s and emphasis %s yield %s", (focusedId, emphasizedId, expected) => {
-    expect(labelState("blog", focusedId, emphasizedId)).toBe(expected);
+    expect(isLabelVisible("blog", focusedId, emphasizedId)).toBe(expected);
   });
 });
 
@@ -74,18 +74,19 @@ describe("body labels", () => {
     label.update(mesh, camera, null, "blog", false);
     const initial = label.object.position.clone();
     expect(initial.x).toBeGreaterThan(2);
-    expect(label.object.element.classList.contains("is-emphasized")).toBe(true);
+    expect(label.object.visible).toBe(true);
     mesh.rotation.y = Math.PI;
     label.update(mesh, camera, null, null, false);
     expect(label.object.position.equals(initial)).toBe(true);
-    expect(label.object.element.classList.contains("is-emphasized")).toBe(false);
+    expect(label.object.visible).toBe(false);
+    expect(label.object.element.style.display).toBe("none");
     label.update(mesh, camera, "blog", "blog", false);
     expect(label.object.visible).toBe(false);
-    label.update(mesh, camera, null, null, true);
+    label.update(mesh, camera, null, "blog", true);
     expect(label.object.visible).toBe(false);
     expect(label.object.element.style.display).toBe("none");
     mesh.position.x = 8;
-    label.update(mesh, camera, null, null, false);
+    label.update(mesh, camera, null, "blog", false);
     expect(label.object.visible).toBe(true);
     expect(label.object.position.x).toBeLessThan(mesh.position.x - 2);
     expect(label.object.center.x).toBe(1);

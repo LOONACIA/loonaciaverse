@@ -26,6 +26,26 @@ describe("camera poses", () => {
     expect(interpolatePose(from, to, 0.5)).toEqual({ position: { x: 4, y: 7, z: 13 }, target: { x: 1, y: 0.5, z: 1.5 } });
   });
 
+  it.each([0.5, 1, 1.5, 2])("fits the oblique orbital disc snugly inside the frame at aspect %s", (aspect) => {
+    const pose = overviewPose(10, aspect);
+    const forward = subtract(pose.target, pose.position);
+    const right = cross(forward, { x: 0, y: 1, z: 0 });
+    const up = cross(right, forward);
+    const length = (vector: Vector3) => Math.hypot(vector.x, vector.y, vector.z);
+    const tangent = Math.tan(Math.PI / 8);
+    const extent = Math.max(...Array.from({ length: 360 }, (_, degree) => {
+      const angle = degree * Math.PI / 180;
+      const offset = subtract({ x: 10 * Math.cos(angle), y: 0, z: 10 * Math.sin(angle) }, pose.position);
+      const depth = dot(offset, forward) / length(forward);
+      return Math.max(
+        Math.abs(dot(offset, up) / length(up)) / (depth * tangent),
+        Math.abs(dot(offset, right) / length(right)) / (depth * tangent * aspect),
+      );
+    }));
+    expect(extent).toBeLessThan(1);
+    expect(extent).toBeGreaterThan(0.8);
+  });
+
   it.each([0.5, 1, 1.5, 2])("approaches the body while preserving the overview direction at aspect %s", (aspect) => {
     const body = { x: 8, y: 0, z: -4 };
     const overview = overviewPose(16.9, aspect);
@@ -38,15 +58,15 @@ describe("camera poses", () => {
     expect(Math.hypot(perpendicular.x, perpendicular.y, perpendicular.z)).toBeCloseTo(0);
   });
 
-  it.each([1.5, 2])("leaves HUD space on the left at aspect %s", (aspect) => {
+  it.each([1.2, 1.5, 2])("centers the body at the HUD's on-screen radius at aspect %s", (aspect) => {
     const body = { x: -3, y: 0, z: 8 };
     const pose = focusPose(body, 0.9, aspect);
-    const forward = subtract(pose.target, pose.position);
-    const right = cross(forward, { x: 0, y: 1, z: 0 });
-    const up = cross(right, forward);
-    const targetToBody = subtract(body, pose.target);
-    expect(dot(right, targetToBody)).toBeGreaterThan(0);
-    expect(dot(up, targetToBody)).toBeCloseTo(0);
+    expect(pose.target).toEqual(body);
+    // A sphere's silhouette subtends asin(radius / distance); NDC spans the full height over 2 units.
+    const offset = subtract(pose.position, body);
+    const silhouette = Math.tan(Math.asin(0.9 / Math.hypot(offset.x, offset.y, offset.z))) / Math.tan(Math.PI / 8) / 2;
+    // HudPanel.razor.css draws its callouts around min(20dvh, 11.5vw).
+    expect(silhouette).toBeCloseTo(Math.min(0.2, 0.115 * aspect));
   });
 
   it.each([0.5, 1])("leaves HUD space below at aspect %s", (aspect) => {

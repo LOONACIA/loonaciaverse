@@ -23,7 +23,7 @@ bodies:
       glowIntensity: 0.4
       surface: terran
     orbit:
-      radius: 8.0
+      radius: 11.0
       periodSeconds: 75.0
       phase: 0.5
   - id: blog
@@ -39,7 +39,7 @@ bodies:
       glowIntensity: 0.3
       surface: gas
     orbit:
-      radius: 12.0
+      radius: 16.0
       periodSeconds: 100.0
       phase: 2.5
   - id: playground
@@ -54,6 +54,6 @@ bodies:
       glowIntensity: 0.25
       surface: desert
     orbit:
-      radius: 16.0
+      radius: 21.0
       periodSeconds: 120.0
       phase: 4.5
