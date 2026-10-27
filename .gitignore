@@ -3,7 +3,7 @@ obj/
 .vs/
 *.user
 TestResults/
-artifacts/
+/artifacts/
 node_modules/
 src/Loonaciaverse.Web/wwwroot/content/
 src/Loonaciaverse.Web/wwwroot/js/
