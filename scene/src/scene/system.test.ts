@@ -144,6 +144,26 @@ describe("createSystem", () => {
     expect(new Vector3(0, 0, 1).transformDirection(ring.matrixWorld).distanceTo(normal)).toBeLessThan(1e-9);
   });
 
+  it("floats a cloud layer between the ground and the atmosphere of terran planets only", () => {
+    const terran = createSystem({ bodies: [{
+      id: "terran", name: "T", subtitle: "PLANET", locked: false,
+      visual: { baseColor: "#236b8e", atmosphereColor: "#5fd4ff", noiseScale: 4, glowIntensity: 0.4, surface: "terran" },
+      orbit: { radius: 11, periodSeconds: 75, phase: 0.5 },
+    }] });
+    systems.push(terran);
+    const [planet] = terran.bodies;
+    const [atmosphere, clouds] = planet.children as Mesh<SphereGeometry, ShaderMaterial>[];
+    expect(atmosphere.material.name).toBe("atmosphere");
+    expect(clouds.material.name).toBe("clouds");
+    expect(clouds.geometry.parameters.radius).toBeGreaterThan(planet.geometry.parameters.radius);
+    expect(clouds.geometry.parameters.radius).toBeLessThan(atmosphere.geometry.parameters.radius);
+    terran.update(2);
+    expect(clouds.material.uniforms.uTime.value).toBe(2);
+    makeSystem().bodies.forEach((body) => {
+      expect(body.children.some((child) => child instanceof Mesh && child.material.name === "clouds")).toBe(false);
+    });
+  });
+
   it("fades the star field out as warp streaks grow", () => {
     const { scene, setWarpStreak } = makeSystem();
     const stars = scene.children.find((child) => child instanceof Points) as Points<BufferGeometry, ShaderMaterial>;

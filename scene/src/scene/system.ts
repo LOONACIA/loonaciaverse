@@ -1,8 +1,8 @@
 import { AdditiveBlending, BufferGeometry, Color, Float32BufferAttribute, LineBasicMaterial, LineSegments, Mesh, PlaneGeometry, Points, RingGeometry, Scene, SphereGeometry } from "three";
 import type { ShaderMaterial, Vector3 } from "three";
 import {
-  createAtmosphereMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial, createPlanetRingMaterial,
-  createStarFieldMaterial, createStarMaterial, PLANET_RING_INNER, PLANET_RING_OUTER,
+  createAtmosphereMaterial, createCloudMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial,
+  createPlanetRingMaterial, createStarFieldMaterial, createStarMaterial, PLANET_RING_INNER, PLANET_RING_OUTER,
 } from "./materials";
 import { createMeteor } from "./meteor";
 import { OrbitClock, orbitPosition } from "./orbit";
@@ -14,6 +14,8 @@ const PLANET_RADIUS = 1.35;
 const SPIN_RADIANS_PER_SECOND = 0.12;
 // Gas giants lean, so the fixed camera sees their equatorial ring as a tilted ellipse.
 const RINGED_AXIAL_TILT = 0.4;
+// Terran clouds float this far above the ground, in planet radii, below the 1.08x atmosphere shell.
+const CLOUD_HEIGHT = 1.02;
 // Mostly cool white stars, with a few warm, pink and teal ones for the dreamy palette.
 const STAR_TINTS = ["#e4ecff", "#e4ecff", "#e4ecff", "#b4cdff", "#b4cdff", "#ffe4c4", "#ffc8ea", "#bff7f0"].map((tint) => new Color(tint));
 
@@ -43,6 +45,12 @@ export function createSystem(universe: UniverseDto, starCount = DESKTOP_STAR_COU
       mesh.add(new Mesh(new PlaneGeometry(STAR_RADIUS * 4, STAR_RADIUS * 4), corona));
     } else {
       mesh.add(new Mesh(new SphereGeometry(PLANET_RADIUS * 1.08, 48, 32), createAtmosphereMaterial(body.visual)));
+    }
+    if (body.visual.surface === "terran") {
+      // Shares the planet's frame and time, so the ground draws shadows of the same clouds.
+      const clouds = createCloudMaterial(body.visual);
+      animatedMaterials.push(clouds);
+      mesh.add(new Mesh(new SphereGeometry(PLANET_RADIUS * CLOUD_HEIGHT, 48, 32), clouds));
     }
     if (body.visual.surface === "gas") {
       // Spin (Y) runs inside the tilt (Z), so the ring stays in the equatorial plane.

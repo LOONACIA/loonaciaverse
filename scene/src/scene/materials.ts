@@ -91,13 +91,50 @@ const bodyVertex = /* glsl */ `
   varying vec3 vViewPosition;
   varying vec3 vNormal;
   varying vec3 vStarDirection;
+  varying vec3 vLocalStarDirection;
   void main() {
     vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
     vPosition = position;
     vViewPosition = viewPosition.xyz;
     vNormal = normalMatrix * normal;
     vStarDirection = (viewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz - viewPosition.xyz;
+    // The same direction in the body's own frame; bodies are never scaled, so the transpose inverts the rotation.
+    vLocalStarDirection = -modelMatrix[3].xyz * mat3(modelMatrix) - position;
     gl_Position = projectionMatrix * viewPosition;
+  }
+`;
+
+// Screen-space derivative bump mapping after Mikkelsen, "Bump Mapping Unparametrized
+// Surfaces on the GPU" (2010), in view space.
+const bump = /* glsl */ `
+  vec3 bumpNormal(vec3 normal, float height) {
+    vec3 dx = dFdx(vViewPosition);
+    vec3 dy = dFdy(vViewPosition);
+    vec3 r1 = cross(dy, normal);
+    vec3 r2 = cross(normal, dx);
+    float det = dot(dx, r1);
+    return normalize(abs(det) * normal - sign(det) * (dFdx(height) * r1 + dFdy(height) * r2));
+  }
+`;
+
+// Sunlight reddens through the long air path near the terminator.
+const reddening = /* glsl */ `
+  vec3 sunlight(float light) {
+    return mix(vec3(1.0, 0.42, 0.2), vec3(1.0), smoothstep(0.0, 0.4, light));
+  }
+`;
+
+// Terran weather, in the planet's own frame so the ground can sample the same clouds for their shadows.
+const clouds = /* glsl */ `
+  float cloudCover(vec3 direction) {
+    // Westerlies carry the weather east, visibly faster than the ground turns.
+    vec3 p = rotateY(direction, -uTime * 0.06) * uNoiseScale * 1.1;
+    // The field shifts through the sphere and its warp changes, so clouds billow, form and dissolve.
+    vec2 warp = vec2(fbm(p * 0.6 + vec3(0.0, uTime * 0.05, 3.1)), fbm(p * 0.6 + vec3(5.2, 1.3, uTime * 0.05))) - 0.5;
+    float density = fbm(p + vec3(warp * 2.0, uTime * 0.03));
+    // A wet equator and storm tracks between dry subtropical belts.
+    density += 0.05 * cos(asin(direction.y) * 6.0);
+    return smoothstep(0.47, 0.72, density);
   }
 `;
 
@@ -110,8 +147,10 @@ const outputColor = /* glsl */ `
 // the view-space shading normal. `light` is the unclamped cosine toward the star from the
 // untilted normal, so night-side effects can fade in.
 const surfaces: Record<PlanetSurface, string> = {
-  // Warped continents with shallow coasts, polar ice, drifting clouds and night-side city lights.
+  // Warped continents with shallow coasts, polar ice, cloud shadows and night-side city lights.
+  // The clouds themselves are a separate layer above the ground.
   terran: /* glsl */ `
+    ${clouds}
     vec3 surface(vec3 direction, float light, inout vec3 normal, out float gloss, out vec3 emission) {
       vec3 p = direction * uNoiseScale * 0.55;
       vec2 warp = vec2(fbm(p + 3.1), fbm(p + 7.7)) - 0.5;
@@ -122,10 +161,13 @@ const surfaces: Record<PlanetSurface, string> = {
       vec3 ground = mix(lowland, vec3(0.50, 0.45, 0.34), smoothstep(0.53, 0.66, height));
       float ice = smoothstep(0.80, 0.86, abs(direction.y) + warp.x * 0.3);
       vec3 color = mix(mix(ocean, ground, land), vec3(0.86, 0.93, 1.0), ice);
-      float clouds = smoothstep(0.47, 0.72, fbm(rotateY(direction, uTime * 0.012) * uNoiseScale * 1.1 + vec3(warp * 2.5, 0.0)));
-      color = mix(color, vec3(0.95, 0.97, 1.0), clouds * 0.9);
-      gloss = (1.0 - land) * (1.0 - ice) * (1.0 - clouds);
-      float settled = smoothstep(0.5, 0.7, valueNoise(direction * uNoiseScale * 3.0)) * land * (1.0 - ice) * (1.0 - clouds);
+      // Shadows fall away from the star, farther when it is low; the offset is exaggerated so they read at this size.
+      vec3 toStar = normalize(vLocalStarDirection);
+      float sunHeight = dot(toStar, direction);
+      float shadow = cloudCover(normalize(direction + (toStar - direction * sunHeight) * 0.03 / max(sunHeight, 0.2)));
+      color *= 1.0 - shadow * 0.6;
+      gloss = (1.0 - land) * (1.0 - ice) * (1.0 - shadow);
+      float settled = smoothstep(0.5, 0.7, valueNoise(direction * uNoiseScale * 3.0)) * land * (1.0 - ice);
       float cities = smoothstep(0.8, 0.92, valueNoise(direction * uNoiseScale * 24.0)) * settled;
       emission = vec3(1.0, 0.72, 0.4) * cities * 0.6 * (1.0 - smoothstep(-0.2, 0.05, light));
       return color;
@@ -177,17 +219,7 @@ const surfaces: Record<PlanetSurface, string> = {
       return height;
     }
 
-    // Screen-space derivative bump mapping after Mikkelsen, "Bump Mapping Unparametrized
-    // Surfaces on the GPU" (2010), in view space.
-    vec3 bumpNormal(vec3 normal, float height) {
-      vec3 dx = dFdx(vViewPosition);
-      vec3 dy = dFdy(vViewPosition);
-      vec3 r1 = cross(dy, normal);
-      vec3 r2 = cross(normal, dx);
-      float det = dot(dx, r1);
-      return normalize(abs(det) * normal - sign(det) * (dFdx(height) * r1 + dFdy(height) * r2));
-    }
-
+    ${bump}
     vec3 surface(vec3 direction, float light, inout vec3 normal, out float gloss, out vec3 emission) {
       gloss = 0.0;
       emission = vec3(0.0);
@@ -208,9 +240,15 @@ const surfaces: Record<PlanetSurface, string> = {
   `,
 };
 
+// Only terran air is dense enough to redden sunlight at the terminator and scatter it by day.
+function airDefines(visual: Visual): Record<string, string> {
+  return visual.surface === "terran" ? { SCATTERING: "" } : {};
+}
+
 export function createPlanetMaterial(visual: Visual): ShaderMaterial {
   return new ShaderMaterial({
     name: "planet",
+    defines: airDefines(visual),
     uniforms: {
       uBaseColor: { value: new Color(visual.baseColor) },
       uAtmosphereColor: { value: new Color(visual.atmosphereColor) },
@@ -228,7 +266,9 @@ export function createPlanetMaterial(visual: Visual): ShaderMaterial {
       varying vec3 vViewPosition;
       varying vec3 vNormal;
       varying vec3 vStarDirection;
+      varying vec3 vLocalStarDirection;
       ${noise}
+      ${reddening}
       ${surfaces[visual.surface!]}
       void main() {
         vec3 sphereNormal = normalize(vNormal);
@@ -243,8 +283,18 @@ export function createPlanetMaterial(visual: Visual): ShaderMaterial {
         float day = max(dot(normal, toStar), 0.0) * step(0.0, light);
         float glint = pow(max(dot(normal, normalize(toStar + toView)), 0.0), 48.0) * gloss * day;
         float limb = pow(1.0 - max(dot(sphereNormal, toView), 0.0), 2.5) * smoothstep(-0.2, 0.4, light);
-        vec3 color = albedo * (day + 0.015) + uAtmosphereColor * 0.008 + vec3(1.0, 0.95, 0.85) * glint * 0.6;
-        color = mix(color, uAtmosphereColor * (day + 0.1), limb * 0.6);
+        #ifdef SCATTERING
+          vec3 sun = sunlight(light);
+          vec3 haze = mix(vec3(1.0, 0.5, 0.35), uAtmosphereColor, smoothstep(0.0, 0.35, light));
+          // The air's own glow: a faint blue veil by day and a warm band just past the terminator.
+          vec3 inscatter = uAtmosphereColor * day * 0.05 + vec3(1.0, 0.45, 0.3) * exp(-pow((light + 0.03) / 0.1, 2.0)) * 0.05;
+        #else
+          vec3 sun = vec3(1.0);
+          vec3 haze = uAtmosphereColor;
+          vec3 inscatter = vec3(0.0);
+        #endif
+        vec3 color = albedo * (day * sun + 0.015) + uAtmosphereColor * 0.008 + vec3(1.0, 0.95, 0.85) * sun * glint * 0.6 + inscatter;
+        color = mix(color, haze * (day + 0.1), limb * 0.6);
         gl_FragColor = vec4(color + emission, 1.0);
         ${outputColor}
       }
@@ -252,9 +302,53 @@ export function createPlanetMaterial(visual: Visual): ShaderMaterial {
   });
 }
 
+export function createCloudMaterial(visual: Visual): ShaderMaterial {
+  return new ShaderMaterial({
+    name: "clouds",
+    uniforms: {
+      uAtmosphereColor: { value: new Color(visual.atmosphereColor) },
+      uNoiseScale: { value: visual.noiseScale },
+      uTime: { value: 0 },
+    },
+    vertexShader: bodyVertex,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uAtmosphereColor;
+      uniform float uNoiseScale;
+      uniform float uTime;
+      varying vec3 vPosition;
+      varying vec3 vViewPosition;
+      varying vec3 vNormal;
+      varying vec3 vStarDirection;
+      ${noise}
+      ${bump}
+      ${reddening}
+      ${clouds}
+      void main() {
+        float cover = cloudCover(normalize(vPosition));
+        vec3 sphereNormal = normalize(vNormal);
+        vec3 toStar = normalize(vStarDirection);
+        vec3 toView = normalize(-vViewPosition);
+        float light = dot(sphereNormal, toStar);
+        // Thick cores bulge, so their sunward sides catch the light.
+        vec3 normal = bumpNormal(sphereNormal, cover * 0.015);
+        // Wrapped light keeps cloud tops lit a little past the terminator, in reddened sunset light.
+        float day = clamp((dot(normal, toStar) + 0.1) / 1.1, 0.0, 1.0);
+        float limb = pow(1.0 - max(dot(sphereNormal, toView), 0.0), 2.5);
+        vec3 color = vec3(0.95, 0.97, 1.0) * (day * sunlight(light) + 0.01);
+        color = mix(color, uAtmosphereColor * (day + 0.05), limb * 0.5);
+        gl_FragColor = vec4(color, cover * 0.9);
+        ${outputColor}
+      }
+    `,
+    transparent: true,
+    depthWrite: false,
+  });
+}
+
 export function createAtmosphereMaterial(visual: Visual): ShaderMaterial {
   return new ShaderMaterial({
     name: "atmosphere",
+    defines: airDefines(visual),
     uniforms: {
       uAtmosphereColor: { value: new Color(visual.atmosphereColor) },
       uGlowIntensity: { value: visual.glowIntensity },
@@ -271,8 +365,14 @@ export function createAtmosphereMaterial(visual: Visual): ShaderMaterial {
       void main() {
         vec3 normal = normalize(vNormal);
         float halo = pow(clamp(abs(dot(normal, normalize(-vViewPosition))) * 2.6, 0.0, 1.0), 3.0);
-        float lit = smoothstep(-0.4, 0.5, dot(normal, normalize(vStarDirection)));
-        gl_FragColor = vec4(uAtmosphereColor, halo * uGlowIntensity * (0.3 + 1.7 * lit));
+        float facing = dot(normal, normalize(vStarDirection));
+        float lit = smoothstep(-0.4, 0.5, facing);
+        vec3 color = uAtmosphereColor;
+        #ifdef SCATTERING
+          // The halo turns warm where it crosses the terminator.
+          color = mix(color, vec3(1.0, 0.45, 0.3), exp(-pow((facing + 0.05) / 0.2, 2.0)) * 0.8);
+        #endif
+        gl_FragColor = vec4(color, halo * uGlowIntensity * (0.3 + 1.7 * lit));
         ${outputColor}
       }
     `,

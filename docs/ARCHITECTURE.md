@@ -38,7 +38,7 @@ loonaciaverse/
 │  │  ├─ scene.ts                   # 공개 계약, 렌더 루프, 입력, 블룸, 수명주기
 │  │  ├─ types.ts                   # UniverseDto, BodyDto, DotNetCallbacks
 │  │  ├─ system.ts                  # 천체·고리·별 필드·성운·유성 생성, 자전, 셰이더 시간, 별 궤적
-│  │  ├─ materials.ts               # 천체 표면(surface별)·대기·고리·코로나·별 필드·성운의 절차적 셰이더
+│  │  ├─ materials.ts               # 천체 표면(surface별)·대기·구름층·고리·코로나·별 필드·성운의 절차적 셰이더
 │  │  ├─ meteor.ts                  # 가끔 배경을 가로지르는 유성, 대기·비행 주기
 │  │  ├─ labels.ts                  # CSS2D 이름표, 클릭·호버, 표시 상태
 │  │  ├─ ring.ts                    # 포커스 홀로그램 링(궤도면)·궤도선·궤도 그리드, 회전·페이드·펼침

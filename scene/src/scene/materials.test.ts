@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { AdditiveBlending, BackSide, Color, ShaderMaterial } from "three";
 import {
-  createAtmosphereMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial, createPlanetRingMaterial,
-  createStarFieldMaterial, createStarMaterial,
+  createAtmosphereMaterial, createCloudMaterial, createCoronaMaterial, createNebulaMaterial, createPlanetMaterial,
+  createPlanetRingMaterial, createStarFieldMaterial, createStarMaterial,
 } from "./materials";
 import type { BodyDto } from "./types";
 
@@ -57,9 +57,41 @@ describe("procedural materials", () => {
     }
   });
 
+  it("scatters sunlight only in terran air", () => {
+    for (const visual of visuals) {
+      const materials = [createPlanetMaterial(visual), createAtmosphereMaterial(visual)];
+      try {
+        materials.forEach((material) => expect(material.defines).toEqual(visual.surface === "terran" ? { SCATTERING: "" } : {}));
+      } finally {
+        materials.forEach((material) => material.dispose());
+      }
+    }
+  });
+
+  it("draws terran clouds as a translucent layer whose cover the ground shares for its shadows", () => {
+    const clouds = createCloudMaterial(visuals[0]);
+    const planet = createPlanetMaterial(visuals[0]);
+    try {
+      expect(clouds.name).toBe("clouds");
+      expect(clouds.uniforms).toEqual({
+        uAtmosphereColor: { value: new Color(visuals[0].atmosphereColor) },
+        uNoiseScale: { value: visuals[0].noiseScale },
+        uTime: { value: 0 },
+      });
+      expect(clouds.transparent).toBe(true);
+      expect(clouds.depthWrite).toBe(false);
+      expect(clouds.vertexShader).toBe(planet.vertexShader);
+      const cover = clouds.fragmentShader.match(/float cloudCover\(vec3 direction\) \{[\s\S]*?return [^;]+;\s*\}/)![0];
+      expect(planet.fragmentShader).toContain(cover);
+    } finally {
+      [clouds, planet].forEach((material) => material.dispose());
+    }
+  });
+
   const factories: [string, () => ShaderMaterial][] = [
     ["planet", () => createPlanetMaterial(visuals[0])],
     ["atmosphere", () => createAtmosphereMaterial(visuals[0])],
+    ["clouds", () => createCloudMaterial(visuals[0])],
     ["planet ring", () => createPlanetRingMaterial(visuals[0])],
     ["star", () => createStarMaterial(visuals[0])],
     ["corona", () => createCoronaMaterial(visuals[0])],
