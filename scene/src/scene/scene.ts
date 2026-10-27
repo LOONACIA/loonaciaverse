@@ -72,7 +72,7 @@ function updateDecorations(current: SceneState, deltaSeconds = 0): void {
     const emphasizedId = body.userData.bodyId === current.hoveredId ? current.hoveredId : current.highlightedId;
     label.update(body, current.camera, current.focusedId, emphasizedId, current.warp !== null);
   });
-  current.ring.update(deltaSeconds, current.camera, current.warp !== null);
+  current.ring.update(deltaSeconds, current.warp !== null);
   current.labelRenderer.render(current.system.scene, current.camera);
 }
 
@@ -186,7 +186,7 @@ export function init(container: HTMLElement, universe: UniverseDto, callbacks: D
   if (originalContainerPosition !== null) container.style.position = "relative";
   const hudColor = getComputedStyle(document.documentElement).getPropertyValue("--color-hud").trim() || "#5fd4ff";
   const ring = createFocusRing(hudColor);
-  system.scene.add(ring.mesh);
+  system.scene.add(ring.mesh, ring.orbit);
   const camera = new PerspectiveCamera(45, 1, 0.1, 1000);
   renderer.setPixelRatio(quality.pixelRatio);
   renderer.domElement.style.display = "block";
