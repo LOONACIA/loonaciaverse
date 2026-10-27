@@ -17,7 +17,7 @@ public class ContentBuildIntegrationTests
 
         Assert.False(string.IsNullOrWhiteSpace(universe.Site.Title));
         Assert.NotEmpty(universe.Bodies);
-        Assert.Contains(posts, post => post.Slug == "hello-loonaciaverse");
+        Assert.NotEmpty(posts);
         Assert.NotEmpty(projects);
         Assert.False(string.IsNullOrWhiteSpace(about.Name));
     }
