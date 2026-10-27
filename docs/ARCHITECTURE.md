@@ -95,7 +95,7 @@ public interface IContentService
 - 글 front matter: `title`, `slug`, `date`, `updated?`, `summary`, `tags`, `draft`, `cover?`
 - 프로젝트 front matter: `title`, `slug`, `summary`, `period`, `role`, `stack`, `links`(github, store, video 등), `thumbnail`, `featured`, `order`, `draft`
 - `about.md` front matter: `name`, `title`(직함), `stack`, `email`, `github`, `linkedin`
-- 천체(`universe.yml`): `id`(`about`|`projects`|`blog`|`playground`), `name`(세계관 이름), `subtitle`(카테고리), `tagline`, `route`, `locked`, `visual`(셰이더 파라미터: 색상, 노이즈 스케일, 대기 색, 글로우 세기, 행성 `surface`(`terran`|`gas`|`desert`, 항성은 생략)), `orbit`(반지름, 주기, 위상)
+- 천체(`universe.yml`): `id`(`about`|`projects`|`blog`|`playground`), `name`(세계관 이름), `subtitle`(카테고리), `route`, `locked`, `visual`(셰이더 파라미터: 색상, 노이즈 스케일, 대기 색, 글로우 세기, 행성 `surface`(`terran`|`gas`|`desert`, 항성은 생략)), `orbit`(반지름, 주기, 위상)
 
 ## 빌드 산출물 (`wwwroot/content/`)
 | 파일 | 내용 |

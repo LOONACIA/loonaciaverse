@@ -18,7 +18,7 @@ public class UniverseBuilderTests
         Assert.Equal(new SiteInfo("LOONACIAVERSE", "https://example.com", "LOONACIA", "개인 우주입니다."), universe.Site);
         Assert.Equal(new[] { "about", "projects", "blog", "playground" }, universe.Bodies.Select(body => body.Id));
         var about = universe.Bodies[0];
-        Assert.Equal(new CelestialBody("about", "LOONACIA", "ABOUT", "소개입니다.", "/about", false, new BodyVisual("#fff2cc", "#ffd780", 3.5, 1.8, null), null), about);
+        Assert.Equal(new CelestialBody("about", "LOONACIA", "ABOUT", "/about", false, new BodyVisual("#fff2cc", "#ffd780", 3.5, 1.8, null), null), about);
         Assert.Equal(new BodyOrbit(8, 75, 0.5), universe.Bodies[1].Orbit);
         Assert.Equal(new BodyVisual("#236b8e", "#5fd4ff", 4, 0.4, "terran"), universe.Bodies[1].Visual);
         Assert.Equal("/projects", universe.Bodies[1].Route);

@@ -23,7 +23,7 @@ public class BodyInfoTests
         Assert.Equal(body.Name, component.Find("h2").TextContent);
         Assert.Equal("-1", component.Find("h2").GetAttribute("tabindex"));
         Assert.Equal(body.Subtitle, component.Find("header .hud-label").TextContent);
-        Assert.Equal(body.Tagline, component.Find(".body-tagline").TextContent);
+        Assert.Equal(2, component.Find("header").ChildElementCount);
     }
 
     [Fact]
@@ -187,7 +187,7 @@ public class BodyInfoTests
         Assert.Equal("SIGNAL UNCONFIRMED", Assert.Single(component.FindAll("dl dd")).TextContent);
         Assert.Equal("COMING SOON", component.Find(".body-coming-soon").TextContent);
         Assert.Empty(component.FindAll("a, .chip, .body-card, .body-metric"));
-        Assert.Equal(new[] { body.Name, body.Subtitle, body.Tagline, "STATUS", "SIGNAL UNCONFIRMED", "COMING SOON" },
+        Assert.Equal(new[] { body.Name, body.Subtitle, "STATUS", "SIGNAL UNCONFIRMED", "COMING SOON" },
             component.FindAll("h2, p, dt, dd").Select(element => element.TextContent));
     }
 
@@ -202,7 +202,6 @@ public class BodyInfoTests
 
         Assert.Equal(body.Name, component.Find("h2").TextContent);
         Assert.Equal(body.Subtitle, component.Find(".hud-label").TextContent);
-        Assert.Equal(body.Tagline, component.Find(".body-tagline").TextContent);
         Assert.Single(component.Find(".body-info").Children);
         Assert.Empty(component.FindAll("dl, a, .body-coming-soon"));
     }

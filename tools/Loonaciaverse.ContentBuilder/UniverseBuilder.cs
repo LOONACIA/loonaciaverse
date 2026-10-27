@@ -102,7 +102,6 @@ public static class UniverseBuilder
 
             validator.ValidateRequired(sourcePath, "name", body.Name);
             validator.ValidateRequired(sourcePath, "subtitle", body.Subtitle);
-            validator.ValidateRequired(sourcePath, "tagline", body.Tagline);
             if (!body.Locked)
             {
                 validator.ValidateRequired(sourcePath, "route", body.Route);
@@ -146,7 +145,7 @@ public static class UniverseBuilder
     {
         var visual = new BodyVisual(body.Visual!.BaseColor, body.Visual.AtmosphereColor, body.Visual.NoiseScale, body.Visual.GlowIntensity, body.Visual.Surface);
         var orbit = body.Orbit is { } data ? new BodyOrbit(data.Radius, data.PeriodSeconds, data.Phase) : null;
-        return new CelestialBody(body.Id, body.Name, body.Subtitle, body.Tagline, body.Route, body.Locked, visual, orbit);
+        return new CelestialBody(body.Id, body.Name, body.Subtitle, body.Route, body.Locked, visual, orbit);
     }
 
     public sealed class SiteData
@@ -167,7 +166,6 @@ public static class UniverseBuilder
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
         public string Subtitle { get; set; } = "";
-        public string Tagline { get; set; } = "";
         public string? Route { get; set; }
         public bool Locked { get; set; }
         public VisualData? Visual { get; set; }

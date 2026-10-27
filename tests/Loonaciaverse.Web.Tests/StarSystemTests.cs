@@ -412,7 +412,6 @@ public class StarSystemTests
         Assert.Same(body, panel.Instance.Body);
         Assert.Same(universe.Stats, panel.Instance.Stats);
         Assert.Equal(body.Name, panel.Find("h2").TextContent);
-        Assert.Equal(body.Tagline, panel.Find(".body-tagline").TextContent);
         Assert.Single(navigation.History);
         module.VerifyNotInvoke("clearFocus");
     }

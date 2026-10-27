@@ -6,7 +6,7 @@ public sealed record BodyVisual(string BaseColor, string AtmosphereColor, double
 
 public sealed record BodyOrbit(double Radius, double PeriodSeconds, double Phase);
 
-public sealed record CelestialBody(string Id, string Name, string Subtitle, string Tagline, string? Route, bool Locked, BodyVisual Visual, BodyOrbit? Orbit);
+public sealed record CelestialBody(string Id, string Name, string Subtitle, string? Route, bool Locked, BodyVisual Visual, BodyOrbit? Orbit);
 
 public sealed record BlogStats(int PostCount, DateOnly? LastPublished, IReadOnlyList<string> TopTags, PostSummary? Latest);
 

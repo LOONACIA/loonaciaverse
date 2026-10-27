@@ -2,7 +2,6 @@ bodies:
   - id: about
     name: LOONACIA
     subtitle: ABOUT
-    tagline: 만들고 배우며 나만의 우주를 넓혀 갑니다.
     route: /about
     locked: false
     visual:
@@ -13,7 +12,6 @@ bodies:
   - id: projects
     name: ARTIFEX
     subtitle: PROJECTS
-    tagline: 아이디어를 실제 경험으로 만든 작업들입니다.
     route: /projects
     locked: false
     visual:
@@ -29,7 +27,6 @@ bodies:
   - id: blog
     name: ARCHIVA
     subtitle: BLOG
-    tagline: 개발의 발견과 회고를 차곡차곡 기록합니다.
     route: /blog
     locked: false
     visual:
@@ -45,7 +42,6 @@ bodies:
   - id: playground
     name: ARCADIA
     subtitle: PLAYGROUND
-    tagline: 새로운 실험의 신호를 준비하고 있습니다.
     locked: true
     visual:
       baseColor: "#a65a35"
