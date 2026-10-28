@@ -34,7 +34,8 @@ public static class PostBuilder
             return new BuildResult(errors);
         }
 
-        var summaries = new List<PostSummary>();
+        var seriesCatalog = SeriesCatalog.Read(contentDir);
+        var includedPosts = new List<(FrontMatterDocument<PostFrontMatter> Document, PostSummary Summary)>();
         Directory.CreateDirectory(contentOutputDir);
         foreach (var document in documents)
         {
@@ -49,18 +50,37 @@ public static class PostBuilder
             var assetBaseUrl = $"/content/posts/{data.Slug}/";
             var cover = ContentAssets.RewriteUrl(data.Cover, assetBaseUrl);
             var summary = new PostSummary(data.Slug, data.Title, date, updated, data.Summary, data.Tags ?? [], data.Draft, cover);
+            includedPosts.Add((document, summary));
+        }
+
+        var seriesDetails = seriesCatalog.Select(series => new SeriesDetail(series.Slug, series.Title, series.Summary,
+            includedPosts.Where(post => post.Document.Data.Series == series.Slug).Select(post => post.Summary)
+                .OrderBy(post => post.Date).ThenBy(post => post.Slug, StringComparer.Ordinal).ToArray())).Where(series => series.Posts.Count > 0).ToArray();
+        var postSeries = seriesDetails.ToDictionary(series => series.Slug,
+            series => new PostSeries(series.Slug, series.Title, series.Posts.Select(post => new SeriesPart(post.Slug, post.Title, post.Draft)).ToArray()), StringComparer.Ordinal);
+        foreach (var (document, summary) in includedPosts)
+        {
+            var data = document.Data;
+            var assetBaseUrl = $"/content/posts/{data.Slug}/";
             var markdown = Markdown.Parse(document.Body, Pipeline);
             var toc = markdown.Descendants<HeadingBlock>().Where(heading => heading.Level is 2 or 3).Select(CreateTocEntry).ToArray();
             ContentAssets.RewriteUrls(markdown, assetBaseUrl);
-            var detail = new PostDetail(summary, markdown.ToHtml(Pipeline), toc);
+            var series = data.Series is not null && postSeries.TryGetValue(data.Series, out var foundSeries) ? foundSeries : null;
+            var detail = new PostDetail(summary, markdown.ToHtml(Pipeline), toc, series);
             var postsOutputDir = Path.Combine(contentOutputDir, "posts");
             Directory.CreateDirectory(postsOutputDir);
             ContentAssets.CopyFiles(Path.Combine(postsDir, data.Slug), Path.Combine(postsOutputDir, data.Slug));
             File.WriteAllText(Path.Combine(postsOutputDir, $"{summary.Slug}.json"), JsonSerializer.Serialize(detail, ContentJson.Options));
-            summaries.Add(summary);
         }
 
-        var sortedSummaries = summaries.OrderByDescending(post => post.Date).ThenBy(post => post.Slug, StringComparer.Ordinal).ToArray();
+        foreach (var series in seriesDetails)
+        {
+            var seriesOutputDir = Path.Combine(contentOutputDir, "series");
+            Directory.CreateDirectory(seriesOutputDir);
+            File.WriteAllText(Path.Combine(seriesOutputDir, $"{series.Slug}.json"), JsonSerializer.Serialize(series, ContentJson.Options));
+        }
+
+        var sortedSummaries = includedPosts.Select(post => post.Summary).OrderByDescending(post => post.Date).ThenBy(post => post.Slug, StringComparer.Ordinal).ToArray();
         File.WriteAllText(Path.Combine(contentOutputDir, "posts.json"), JsonSerializer.Serialize(sortedSummaries, ContentJson.Options));
         return new BuildResult([]);
     }
@@ -88,5 +108,6 @@ public static class PostBuilder
         public List<string> Tags { get; set; } = [];
         public bool Draft { get; set; }
         public string? Cover { get; set; }
+        public string? Series { get; set; }
     }
 }

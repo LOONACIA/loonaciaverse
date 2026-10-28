@@ -49,4 +49,16 @@ internal static class ContentTestData
         var projectDir = Directory.CreateDirectory(Path.Combine(contentDir, "projects", folder)).FullName;
         File.WriteAllText(Path.Combine(projectDir, "index.md"), $"---\n{metadata}\n---\n{body}");
     }
+
+    public static void WritePost(string contentDir, string folder, string metadata, string body = "본문입니다.")
+    {
+        var postDir = Directory.CreateDirectory(Path.Combine(contentDir, "posts", folder)).FullName;
+        File.WriteAllText(Path.Combine(postDir, "index.md"), $"---\n{metadata}\n---\n{body}");
+    }
+
+    public static void WriteSeries(string contentDir, string yaml)
+    {
+        Directory.CreateDirectory(contentDir);
+        File.WriteAllText(Path.Combine(contentDir, "series.yml"), yaml);
+    }
 }

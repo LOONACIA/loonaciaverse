@@ -58,6 +58,16 @@ public static class SeoBuilder
             urls.Add(CreateSitemapUrl($"{baseUrl}/blog/tags/{tag}"));
         }
 
+        var seriesDir = Path.Combine(contentOutputDir, "series");
+        if (Directory.Exists(seriesDir))
+        {
+            var seriesDetails = Directory.EnumerateFiles(seriesDir, "*.json").Select(path => ReadOutput<SeriesDetail>(seriesDir, Path.GetFileName(path)));
+            foreach (var series in seriesDetails.Where(series => series.Posts.Any(post => !post.Draft)).OrderBy(series => series.Slug, StringComparer.Ordinal))
+            {
+                urls.Add(CreateSitemapUrl($"{baseUrl}/blog/series/{series.Slug}"));
+            }
+        }
+
         new XDocument(urls).Save(Path.Combine(outputDir, "sitemap.xml"));
         File.WriteAllText(Path.Combine(outputDir, "robots.txt"), $"User-agent: *\nAllow: /\nSitemap: {baseUrl}/sitemap.xml\n");
     }

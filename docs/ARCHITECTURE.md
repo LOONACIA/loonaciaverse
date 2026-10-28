@@ -95,7 +95,7 @@ public interface IContentService
 ```
 - `Universe`: 사이트 정보(`site.yml`), 천체 목록(`universe.yml`), 천체별 HUD 스탯(빌드할 때 계산).
 - 글 front matter: `title`, `slug`, `date`, `updated?`, `summary`, `tags`, `draft`, `cover?`, `series?`
-- 시리즈(`series.yml`, 없어도 된다): `slug`, `title`, `summary`. 글은 front matter `series`로 시리즈 하나에만 속한다. 편 순서는 `date` 오름차순이고 같으면 slug 순이다. 빌드에 포함된 글로만 시리즈를 구성하며, 예정 편은 두지 않는다.
+- 시리즈(`series.yml`, 없어도 된다): 최상위 `series` 목록에 `slug`, `title`, `summary`를 둔다. 글은 front matter `series`로 시리즈 하나에만 속한다. 편 순서는 `date` 오름차순이고 같으면 slug 순이다. 빌드에 포함된 글로만 시리즈를 구성하며, 예정 편은 두지 않는다.
 - 프로젝트 front matter: `title`, `slug`, `summary`, `period`, `role`, `stack`, `links`(github, store, video 등), `thumbnail`, `featured`, `order`, `draft`
 - `about.md` front matter: `name`, `title`(직함), `stack`, `email`, `github`, `linkedin`
 - 천체(`universe.yml`): `id`(`about`|`projects`|`blog`|`playground`), `name`(세계관 이름), `subtitle`(카테고리), `route`, `locked`, `visual`(셰이더 파라미터: 색상, 노이즈 스케일, 대기 색, 글로우 세기, 행성 `surface`(`terran`|`gas`|`desert`, 항성은 생략)), `orbit`(반지름, 주기, 위상)
