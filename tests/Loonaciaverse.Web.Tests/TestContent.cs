@@ -28,6 +28,8 @@ public static class TestContent
         new("last-post", "마지막 기록", new DateOnly(2025, 2, 3), null, "기술을 기록합니다.", ["Blazor", "C#", "alpha"], false, null)
     ];
 
+    public static SeriesDetail Series() => new("first-series", "첫 번째 시리즈", "함께 배우며 기록하는 시리즈입니다.", Posts().OrderBy(post => post.Date).ToArray());
+
     public static AboutProfile About() => new(
         "루나", "개발자", ["C#", "Blazor", "게임 개발"], "loona@example.com", "https://github.com/example", "https://www.linkedin.com/in/example", "<h2>소개</h2><p>함께 <strong>만듭니다</strong>.</p>");
 

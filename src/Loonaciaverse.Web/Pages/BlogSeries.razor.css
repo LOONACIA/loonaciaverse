@@ -1,0 +1,15 @@
+.blog-page {
+    max-width: 72ch;
+    margin-inline: auto;
+    font-family: var(--font-body);
+}
+
+.all-posts {
+    display: inline-block;
+    margin-bottom: 0.5rem;
+}
+
+.series-summary {
+    color: var(--color-text-muted);
+    font-family: var(--font-body);
+}

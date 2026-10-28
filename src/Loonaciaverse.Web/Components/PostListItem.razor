@@ -1,5 +1,9 @@
 <article class="post-list-item">
     <div class="post-meta">
+        @if (Part is { } part)
+        {
+            <span class="hud-label post-part">PART @part</span>
+        }
         <time datetime="@Formatting.FormatDate(Post.Date)">@Formatting.FormatDate(Post.Date)</time>
         @if (Post.Draft)
         {
@@ -19,4 +23,7 @@
 @code {
     [Parameter, EditorRequired]
     public PostSummary Post { get; set; } = default!;
+
+    [Parameter]
+    public int? Part { get; set; }
 }

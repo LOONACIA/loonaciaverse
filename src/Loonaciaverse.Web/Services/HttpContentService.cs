@@ -14,6 +14,8 @@ public sealed partial class HttpContentService(HttpClient httpClient) : IContent
 
     public Task<PostDetail?> GetPostAsync(string slug, CancellationToken cancellationToken = default) => GetDetailAsync<PostDetail>("posts", slug, cancellationToken);
 
+    public Task<SeriesDetail?> GetSeriesAsync(string slug, CancellationToken cancellationToken = default) => GetDetailAsync<SeriesDetail>("series", slug, cancellationToken);
+
     public Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(CancellationToken cancellationToken = default) =>
         GetRequiredAsync<IReadOnlyList<ProjectSummary>>("content/projects.json", cancellationToken);
 

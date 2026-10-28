@@ -26,6 +26,11 @@ public class HttpContentServiceTests
         },
         { "posts", "content/posts.json", new[] { Post } },
         { "post", "content/posts/hello-2026.json", new PostDetail(Post, "<h2 id=\"intro\">Intro</h2>", [new TocEntry(2, "intro", "Intro")]) },
+        {
+            "post", "content/posts/hello-2026.json",
+            new PostDetail(Post, "<p>Series post</p>", [], new PostSeries("first-series", "첫 번째 시리즈", [new SeriesPart(Post.Slug, Post.Title, Post.Draft), new SeriesPart("draft-post", "초안 편", true)]))
+        },
+        { "series", "content/series/hello-2026.json", new SeriesDetail("hello-2026", "첫 번째 시리즈", "시리즈 설명입니다.", [Post]) },
         { "projects", "content/projects.json", new[] { Project } },
         { "project", "content/projects/hello-2026.json", new ProjectDetail(Project, "<p>Project details</p>") },
         { "about", "content/about.json", About }
@@ -73,6 +78,7 @@ public class HttpContentServiceTests
         var service = new HttpContentService(client);
 
         Assert.Null(await service.GetPostAsync(slug!));
+        Assert.Null(await service.GetSeriesAsync(slug!));
         Assert.Null(await service.GetProjectAsync(slug!));
         Assert.Empty(handler.Requests);
     }
@@ -80,15 +86,23 @@ public class HttpContentServiceTests
     [Theory]
     [InlineData("post", "a")]
     [InlineData("project", "0")]
+    [InlineData("series", "a")]
     [InlineData("post", "hello-2026")]
     [InlineData("project", "hello-2026")]
+    [InlineData("series", "hello-2026")]
     public async Task DetailNotFoundReturnsNull(string method, string slug)
     {
         using var handler = StatusHandler(HttpStatusCode.NotFound);
         using var client = CreateClient(handler);
         var service = new HttpContentService(client);
 
-        var result = method == "post" ? (object?)await service.GetPostAsync(slug) : await service.GetProjectAsync(slug);
+        var result = method switch
+        {
+            "post" => (object?)await service.GetPostAsync(slug),
+            "series" => await service.GetSeriesAsync(slug),
+            "project" => await service.GetProjectAsync(slug),
+            _ => throw new ArgumentOutOfRangeException(nameof(method))
+        };
 
         Assert.Null(result);
         Assert.Single(handler.Requests);
@@ -98,6 +112,7 @@ public class HttpContentServiceTests
     [InlineData("universe")]
     [InlineData("posts")]
     [InlineData("post")]
+    [InlineData("series")]
     [InlineData("projects")]
     [InlineData("project")]
     [InlineData("about")]
@@ -130,6 +145,7 @@ public class HttpContentServiceTests
     [InlineData("universe")]
     [InlineData("posts")]
     [InlineData("post")]
+    [InlineData("series")]
     [InlineData("projects")]
     [InlineData("project")]
     [InlineData("about")]
@@ -204,6 +220,7 @@ public class HttpContentServiceTests
         "universe" => await service.GetUniverseAsync(cancellationToken),
         "posts" => await service.GetPostsAsync(cancellationToken),
         "post" => await service.GetPostAsync("hello-2026", cancellationToken),
+        "series" => await service.GetSeriesAsync("hello-2026", cancellationToken),
         "projects" => await service.GetProjectsAsync(cancellationToken),
         "project" => await service.GetProjectAsync("hello-2026", cancellationToken),
         "about" => await service.GetAboutAsync(cancellationToken),

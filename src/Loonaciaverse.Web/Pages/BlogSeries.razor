@@ -1,0 +1,21 @@
+@page "/blog/series/{Slug}"
+@layout PageLayout
+@inject IContentService ContentService
+
+<ContentLoader @key="Slug" TItem="SeriesDetail" Load="cancellationToken => ContentService.GetSeriesAsync(Slug, cancellationToken)" Context="series">
+    <PageMeta Title="@($"{series.Title} · BLOG")" Description="@series.Summary" />
+    <section class="blog-page">
+        <PageHeader BodyId="blog" Label="SERIES" Title="@series.Title" />
+        <p class="series-summary">@series.Summary</p>
+        <a class="all-posts" href="/blog">전체 글</a>
+        @for (var index = 0; index < series.Posts.Count; index++)
+        {
+            <PostListItem Post="series.Posts[index]" Part="index + 1" />
+        }
+    </section>
+</ContentLoader>
+
+@code {
+    [Parameter]
+    public string Slug { get; set; } = string.Empty;
+}
