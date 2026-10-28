@@ -16,6 +16,7 @@
 | `/projects/{slug}` | 프로젝트 상세(케이스 스터디) |
 | `/blog` | 블로그 목록 |
 | `/blog/tags/{tag}` | 태그별 글 목록 |
+| `/blog/series/{slug}` | 시리즈 페이지 |
 | `/blog/{slug}` | 글 상세 |
 | `/about` | About(중심 항성) |
 | 그 밖 | 404(LOST IN SPACE) |
@@ -164,8 +165,17 @@ HUD가 열리거나 선택한 천체가 바뀌면 키보드 포커스를 HUD 제
 - **글 상세** `/blog/{slug}`:
   - 메타 줄은 `PUBLISHED yyyy-MM-dd`이고, 수정된 글이면 `· UPDATED yyyy-MM-dd`를 붙인다.
   - 제목, 태그, 커버 이미지(있으면) 뒤에 본문이 온다.
+  - 시리즈에 속한 글이면 헤더 바로 아래(커버 이미지 위)에 시리즈 박스를 둔다.
+    - `SERIES` 라벨, 시리즈 제목(시리즈 페이지 링크), `PART n / N`, 편 목록을 보여 준다.
+    - 편 목록은 항상 펼쳐 두고 현재 편을 표시한다. Debug 빌드의 초안 편에는 `DRAFT` 배지를 붙인다.
   - 목차(`CONTENTS`)는 데스크톱에서 오른쪽에 sticky로, 모바일에서는 본문 위에 접이식으로 둔다.
+  - 시리즈에 속한 글이면 본문 아래에 `← PREV`·`NEXT →`와 각 편의 제목을 둔다. 첫 편에는 PREV, 마지막 편에는 NEXT가 없다.
   - 하단에 `← ALL POSTS` 링크를 둔다.
+- **시리즈** `/blog/series/{slug}`:
+  - 헤더는 `SERIES` 라벨과 시리즈 제목이고, 그 아래에 시리즈 설명과 "전체 글" 링크를 둔다.
+  - 편 목록은 블로그 목록과 같은 형식에 `PART n`을 더하고, 발행일 오름차순이다.
+  - 페이지 제목은 `{시리즈 제목} · BLOG`, description은 시리즈 설명이다.
+  - 없는 시리즈나 공개된 편이 없는 시리즈는 404다.
 - **프로젝트 목록** `/projects`:
   - 카드 그리드로 보여 준다(썸네일 16:9, 제목, 기간, 역할, 스택 칩, 요약).
   - `featured` 카드에는 `FEATURED` 배지를 붙이고 맨 앞에 둔다.
@@ -205,4 +215,4 @@ HUD 라벨은 대문자로 쓰고 `letter-spacing: 0.12em`을 준다.
 탭이 숨겨지면(`visibilitychange`) 렌더 루프를 멈춘다. 목표 프레임은 PRD 제약(데스크톱 60fps, 중급 모바일 30fps)이다.
 
 ## 10. HUD 카피
-`SELECT DESTINATION`, `TRAVEL`, `BACK`, `COMING SOON`, `SIGNAL UNCONFIRMED`, `NAVIGATION SYSTEM BOOT`, `LOST IN SPACE`, `RETURN TO ORBIT`, `SIGNAL LOST`, `RETRY`, `POSTS`, `LAST TRANSMISSION`, `TOP TAGS`, `LATEST`, `PROJECTS`, `PRIMARY STACK`, `FEATURED`, `CLASS`, `COMMS`, `STATUS`, `CONTENTS`, `PUBLISHED`, `UPDATED`, `PERIOD`, `ROLE`, `STACK`, `LINKS`, `DRAFT`, `ALL POSTS`, `TAG`
+`SELECT DESTINATION`, `TRAVEL`, `BACK`, `COMING SOON`, `SIGNAL UNCONFIRMED`, `NAVIGATION SYSTEM BOOT`, `LOST IN SPACE`, `RETURN TO ORBIT`, `SIGNAL LOST`, `RETRY`, `POSTS`, `LAST TRANSMISSION`, `TOP TAGS`, `LATEST`, `PROJECTS`, `PRIMARY STACK`, `FEATURED`, `CLASS`, `COMMS`, `STATUS`, `CONTENTS`, `PUBLISHED`, `UPDATED`, `PERIOD`, `ROLE`, `STACK`, `LINKS`, `DRAFT`, `ALL POSTS`, `TAG`, `SERIES`, `PART`, `PREV`, `NEXT`

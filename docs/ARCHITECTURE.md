@@ -14,7 +14,7 @@ loonaciaverse/
 ├─ src/
 │  ├─ Loonaciaverse.Core/            # 콘텐츠 모델(record), IContentService. 외부 의존성 없음
 │  └─ Loonaciaverse.Web/             # Blazor WASM Standalone
-│     ├─ Pages/                      # 라우트 컴포넌트 (Home, BlogList, BlogPost, ProjectList, ProjectDetail, About, NotFound)
+│     ├─ Pages/                      # 라우트 컴포넌트 (Home, BlogList, BlogPost, BlogSeries, ProjectList, ProjectDetail, About, NotFound)
 │     ├─ Components/
 │     │  ├─ StarSystem.razor         # 씬 수명주기, URL 포커스, 키보드 입력, HUD·목록형 홈 전환
 │     │  ├─ HudPanel.razor           # HUD(데스크톱 콜아웃, 모바일 하단 시트), 닫기·TRAVEL 버튼
@@ -53,6 +53,7 @@ loonaciaverse/
 ├─ content/
 │  ├─ site.yml                       # 사이트 제목, baseUrl, 작성자
 │  ├─ universe.yml                   # 천체 정의
+│  ├─ series.yml                     # 블로그 시리즈 정의(선택)
 │  ├─ about.md
 │  ├─ posts/{slug}/index.md          # 이미지 등은 같은 폴더에
 │  └─ projects/{slug}/index.md
@@ -86,13 +87,15 @@ public interface IContentService
     Task<Universe> GetUniverseAsync();
     Task<IReadOnlyList<PostSummary>> GetPostsAsync();
     Task<PostDetail?> GetPostAsync(string slug);
+    Task<SeriesDetail?> GetSeriesAsync(string slug);
     Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync();
     Task<ProjectDetail?> GetProjectAsync(string slug);
     Task<AboutProfile> GetAboutAsync();
 }
 ```
 - `Universe`: 사이트 정보(`site.yml`), 천체 목록(`universe.yml`), 천체별 HUD 스탯(빌드할 때 계산).
-- 글 front matter: `title`, `slug`, `date`, `updated?`, `summary`, `tags`, `draft`, `cover?`
+- 글 front matter: `title`, `slug`, `date`, `updated?`, `summary`, `tags`, `draft`, `cover?`, `series?`
+- 시리즈(`series.yml`, 없어도 된다): `slug`, `title`, `summary`. 글은 front matter `series`로 시리즈 하나에만 속한다. 편 순서는 `date` 오름차순이고 같으면 slug 순이다. 빌드에 포함된 글로만 시리즈를 구성하며, 예정 편은 두지 않는다.
 - 프로젝트 front matter: `title`, `slug`, `summary`, `period`, `role`, `stack`, `links`(github, store, video 등), `thumbnail`, `featured`, `order`, `draft`
 - `about.md` front matter: `name`, `title`(직함), `stack`, `email`, `github`, `linkedin`
 - 천체(`universe.yml`): `id`(`about`|`projects`|`blog`|`playground`), `name`(세계관 이름), `subtitle`(카테고리), `route`, `locked`, `visual`(셰이더 파라미터: 색상, 노이즈 스케일, 대기 색, 글로우 세기, 행성 `surface`(`terran`|`gas`|`desert`, 항성은 생략)), `orbit`(반지름, 주기, 위상)
@@ -102,7 +105,8 @@ public interface IContentService
 |---|---|
 | `universe.json` | 사이트 정보, 천체 정의, HUD 스탯 |
 | `posts.json` | 글 요약 목록(날짜 내림차순) |
-| `posts/{slug}.json` | 글 메타, 본문 HTML, 목차 |
+| `posts/{slug}.json` | 글 메타, 본문 HTML, 목차, 시리즈 정보(시리즈에 속한 글만: 시리즈 slug·제목, 편 순서대로 편 slug·제목·초안 여부) |
+| `series/{slug}.json` | 시리즈 slug·제목·설명, 편 순서대로 글 요약 목록. 빌드에 포함된 편이 하나 이상인 시리즈만 |
 | `posts/{slug}/*` | 글 폴더의 이미지 복사본 |
 | `projects.json`, `projects/{slug}.json`, `projects/{slug}/*` | 프로젝트, 글과 같은 구조 |
 | `about.json` | 프로필과 본문 HTML |
@@ -190,8 +194,8 @@ export function dispose(): void;
 ## 테스트
 | 대상 | 도구 | 명령 |
 |---|---|---|
-| ContentBuilder (front matter 파싱, 검증 실패, 인덱스·RSS·sitemap·TOC 생성, 초안 제외, YouTube 임베드) | xUnit | `dotnet test` |
-| Web 컴포넌트·SceneInterop (URL↔포커스, history·닫기, 키보드 순환·DOM 포커스, TRAVEL·실패 시 이동, fallback·수명주기, HUD 스탯·잠금, 상단 바, 목록·상세 렌더, 404), OG 일치·이미지 및 SWA 설정 검사 | xUnit + bUnit + 가짜 `IContentService`·JS interop | `dotnet test` |
+| ContentBuilder (front matter 파싱, 검증 실패, 인덱스·RSS·sitemap·TOC 생성, 초안 제외, YouTube 임베드, 시리즈 검증·편 순서·산출물) | xUnit | `dotnet test` |
+| Web 컴포넌트·SceneInterop (URL↔포커스, history·닫기, 키보드 순환·DOM 포커스, TRAVEL·실패 시 이동, fallback·수명주기, HUD 스탯·잠금, 상단 바, 목록·상세 렌더, 시리즈 박스·이전/다음·시리즈 페이지, 404), OG 일치·이미지 및 SWA 설정 검사 | xUnit + bUnit + 가짜 `IContentService`·JS interop | `dotnet test` |
 | 전송량 예산 검사 (집계·제외 대상, `.br` 우선, Pretendard 청크 선택, 필수 자산, 한도 경계, 종료 코드) | xUnit | `dotnet test` |
 | 씬 순수 로직 (공전 위치·시간·정지 조건, 카메라 구도·보간·트윈, 워프 타임라인, 품질 단계, 이름표 상태·링 페이드·궤도선 펼침, 유성 주기) | Vitest | `npm test --prefix scene` |
 | 씬 구성·계약 (천체·별·셰이더 uniforms, 이름표·링, 클릭·호버·강조, 워프 타이머·입력 차단, resize·블룸·dispose) | Vitest + happy-dom, 렌더러·composer 모의 객체 | `npm test --prefix scene` |

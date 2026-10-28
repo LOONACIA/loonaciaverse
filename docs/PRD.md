@@ -37,6 +37,10 @@ C#/.NET·Unity 개발자의 포트폴리오 겸 기술 블로그를 "나를 중�
 - `/blog/tags/{tag}`에 해당 태그 글만 보인다.
 - `/blog/{slug}`에 글이 보인다. 헤딩으로 만든 목차가 있고, 코드 블록은 highlight.js로 하이라이트된다.
 - 빌드 산출물에 `feed.xml`(RSS 2.0)이 있고, 초안을 뺀 모든 글이 들어 있다.
+- front matter에 `series`가 있는 글의 `/blog/{slug}`에는 헤더 아래에 시리즈 박스(시리즈 제목, `PART n / N`, 편 목록과 현재 편)가 보이고, 본문 아래에 이전·다음 편 링크가 보인다.
+- `/blog/series/{slug}`에 시리즈 제목, 설명, 편 목록이 발행일 오름차순으로 보인다. 없는 시리즈나 공개된 편이 없는 시리즈는 404 페이지를 보여 준다.
+- 시리즈는 빌드에 포함된 글로만 구성한다. Release 빌드에서는 초안 편을 빼고 번호와 총수를 계산한다.
+- `sitemap.xml`에 공개된 편이 있는 시리즈 페이지가 들어 있다.
 
 ### 4. About (중심 항성)
 완료 판정 기준:
@@ -54,6 +58,7 @@ C#/.NET·Unity 개발자의 포트폴리오 겸 기술 블로그를 "나를 중�
 - `draft: true`인 글과 프로젝트는 Release 빌드에서 빠지고, Debug 빌드에서는 DRAFT 표시와 함께 보인다.
 - 빌드 산출물에 `sitemap.xml`, `robots.txt`, `feed.xml`이 생성된다.
 - front matter 필수 필드가 빠졌거나 slug가 중복되면 빌드가 실패하고, 원인 파일 경로를 출력한다.
+- 글이 `content/series.yml`에 없는 시리즈를 참조하거나, 시리즈 정의에 필수 필드가 빠졌거나 slug가 중복되거나, 어떤 글(초안 포함)도 참조하지 않는 시리즈가 있으면 빌드가 실패한다.
 
 ### 7. 배포
 완료 판정 기준:
@@ -79,7 +84,7 @@ C#/.NET·Unity 개발자의 포트폴리오 겸 기술 블로그를 "나를 중�
 - **브라우저**: WebGL2를 지원하는 최신 Chrome, Edge, Safari(iOS 포함), Firefox. 미지원 환경은 기능 5의 목록형 홈으로 대체한다.
 - **언어**: 콘텐츠는 한국어, HUD와 UI 라벨은 영어 대문자다.
 - **비용**: Azure Static Web Apps Free 플랜과 보유 도메인만 쓴다. 유료 서비스를 추가하지 않는다.
-- **URL 영속성**: 공개한 URL(`/blog/{slug}`, `/projects/{slug}`, `/about`, `/blog/tags/{tag}`)은 호스팅을 옮겨도 바꾸지 않는다. slug는 영문 kebab-case다.
+- **URL 영속성**: 공개한 URL(`/blog/{slug}`, `/projects/{slug}`, `/about`, `/blog/tags/{tag}`, `/blog/series/{slug}`)은 호스팅을 옮겨도 바꾸지 않는다. slug는 영문 kebab-case다.
 - **저장소**: GitHub 비공개 저장소로 시작하고 안정화되면 공개한다. 공개하면 초안이 커밋 이력에 드러나므로 공개 전에 처리 방식을 다시 정한다.
 
 ## 미정 값
