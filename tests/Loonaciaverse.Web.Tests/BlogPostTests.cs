@@ -187,6 +187,110 @@ public class BlogPostTests
         Assert.Equal(new[] { first.Meta.Slug, second.Meta.Slug }, service.PostCalls.Select(call => call.Slug));
     }
 
+    [Fact]
+    public void MiddleSeriesPostRendersSeriesBoxPartsAndAdjacentLinksInArticleOrder()
+    {
+        using var context = new BunitContext();
+        var series = TestContent.PostSeries();
+        var post = TestContent.Post() with { Series = series };
+        ConfigureService(context, post);
+
+        var component = context.Render<BlogPost>(parameters => parameters.Add(p => p.Slug, post.Meta.Slug));
+
+        var box = component.Find("aside.series-box.hud-frame");
+        Assert.Equal("시리즈", box.GetAttribute("aria-label"));
+        Assert.Equal("series-box", box.ClassList.First());
+        Assert.Equal("SERIES", box.QuerySelector(".hud-label")!.TextContent);
+        var title = box.QuerySelector("a.series-title")!;
+        Assert.Equal(series.Title, title.TextContent);
+        Assert.Equal($"/blog/series/{series.Slug}", title.GetAttribute("href"));
+        Assert.Equal("PART 2 / 3", box.QuerySelector(".series-progress")!.TextContent);
+        var parts = box.QuerySelectorAll("ol.series-parts > li");
+        Assert.Equal(series.Parts.Select(part => part.Title), parts.Select(part => part.FirstElementChild!.TextContent));
+        var current = Assert.Single(parts, part => part.ClassList.Contains("current"));
+        Assert.Same(parts[1], current);
+        Assert.Empty(current.QuerySelectorAll("a"));
+        var currentTitle = Assert.Single(box.QuerySelectorAll("[aria-current='page']"));
+        Assert.Equal("SPAN", currentTitle.TagName);
+        Assert.Equal(series.Parts[1].Title, currentTitle.TextContent);
+        Assert.Equal(series.Parts.Where(part => part.Slug != post.Meta.Slug).Select(part => $"/blog/{part.Slug}"), box.QuerySelectorAll(".series-parts a").Select(link => link.GetAttribute("href")));
+        for (var index = 0; index < parts.Length; index++)
+        {
+            var badges = parts[index].QuerySelectorAll(".badge.badge-draft");
+            if (series.Parts[index].Draft)
+            {
+                Assert.Equal("DRAFT", Assert.Single(badges).TextContent);
+            }
+            else
+            {
+                Assert.Empty(badges);
+            }
+        }
+        Assert.Single(box.QuerySelectorAll(".badge-draft"));
+        var navigation = component.Find("nav.series-nav");
+        Assert.Equal("시리즈 이동", navigation.GetAttribute("aria-label"));
+        var previous = component.Find("a.series-prev");
+        Assert.Equal($"/blog/{series.Parts[0].Slug}", previous.GetAttribute("href"));
+        Assert.Equal("← PREV", previous.QuerySelector(".hud-label")!.TextContent);
+        Assert.Equal(series.Parts[0].Title, previous.QuerySelector(".series-nav-title")!.TextContent);
+        var next = component.Find("a.series-next");
+        Assert.Equal($"/blog/{series.Parts[2].Slug}", next.GetAttribute("href"));
+        Assert.Equal("NEXT →", next.QuerySelector(".hud-label")!.TextContent);
+        Assert.Equal(series.Parts[2].Title, next.QuerySelector(".series-nav-title")!.TextContent);
+        Assert.Equal(new[] { "page-header", "series-box", "post-cover", "prose", "series-nav", "all-posts" },
+            component.Find("article.blog-post").Children.Select(child => child.ClassList.First()));
+    }
+
+    [Theory]
+    [InlineData(0, "series-prev", "series-next", 1)]
+    [InlineData(2, "series-next", "series-prev", 1)]
+    public void SeriesEndpointsOnlyLinkToExistingAdjacentPart(int currentIndex, string absentClass, string presentClass, int adjacentIndex)
+    {
+        using var context = new BunitContext();
+        var series = TestContent.PostSeries();
+        var post = TestContent.Post() with { Series = series };
+        post = post with { Meta = post.Meta with { Slug = series.Parts[currentIndex].Slug, Title = series.Parts[currentIndex].Title } };
+        ConfigureService(context, post);
+
+        var component = context.Render<BlogPost>(parameters => parameters.Add(p => p.Slug, post.Meta.Slug));
+
+        Assert.Empty(component.FindAll($".{absentClass}"));
+        var link = component.Find($".series-nav a.{presentClass}");
+        Assert.Equal($"/blog/{series.Parts[adjacentIndex].Slug}", link.GetAttribute("href"));
+        Assert.Equal(series.Parts[adjacentIndex].Title, link.QuerySelector(".series-nav-title")!.TextContent);
+        Assert.Single(component.FindAll(".series-nav a"));
+        Assert.Equal($"PART {currentIndex + 1} / 3", component.Find(".series-progress").TextContent);
+        Assert.Equal(series.Parts[currentIndex].Title, component.Find(".series-parts .current [aria-current='page']").TextContent);
+    }
+
+    [Fact]
+    public void SinglePartSeriesRendersBoxWithoutNavigation()
+    {
+        using var context = new BunitContext();
+        var series = TestContent.PostSeries();
+        var post = TestContent.Post() with { Series = series with { Parts = [series.Parts[1]] } };
+        ConfigureService(context, post);
+
+        var component = context.Render<BlogPost>(parameters => parameters.Add(p => p.Slug, post.Meta.Slug));
+
+        Assert.Equal("PART 1 / 1", component.Find(".series-box .series-progress").TextContent);
+        Assert.Single(component.FindAll(".series-parts > li.current"));
+        Assert.Empty(component.FindAll(".series-nav"));
+    }
+
+    [Fact]
+    public void PostWithoutSeriesOmitsSeriesBoxAndNavigation()
+    {
+        using var context = new BunitContext();
+        var post = TestContent.Post();
+        ConfigureService(context, post);
+
+        var component = context.Render<BlogPost>(parameters => parameters.Add(p => p.Slug, post.Meta.Slug));
+
+        Assert.Null(post.Series);
+        Assert.Empty(component.FindAll(".series-box, .series-nav"));
+    }
+
     private static FakeContentService ConfigureService(BunitContext context, PostDetail? post)
     {
         context.JSInterop.SetupModule("./js/highlight.js").SetupVoid("highlightAll", _ => true).SetVoidResult();

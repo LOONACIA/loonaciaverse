@@ -1,0 +1,53 @@
+.series-box {
+    min-width: 0;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    font-family: var(--font-body);
+    overflow-wrap: anywhere;
+}
+
+.series-title {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-family: var(--font-body);
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.series-progress {
+    margin-top: 0.5rem;
+    color: var(--color-text-muted);
+    font-family: var(--font-hud);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.12em;
+}
+
+.series-parts {
+    margin: 0.75rem 0 0;
+    padding-left: 1.5rem;
+    font-family: var(--font-body);
+}
+
+.series-parts li + li {
+    margin-top: 0.5rem;
+}
+
+.series-parts a {
+    color: var(--color-text-muted);
+    text-decoration: none;
+}
+
+.series-parts a:hover,
+.series-parts a:focus-visible {
+    color: var(--color-hud);
+    text-decoration: underline;
+}
+
+.current {
+    color: var(--color-hud);
+    font-weight: 600;
+}
+
+.badge-draft {
+    margin-left: 0.5rem;
+}

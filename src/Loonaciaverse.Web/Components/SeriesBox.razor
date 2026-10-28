@@ -1,0 +1,47 @@
+<aside class="series-box hud-frame" aria-label="시리즈">
+    <div class="hud-label">SERIES</div>
+    <a class="series-title" href="/blog/series/@Series.Slug">@Series.Title</a>
+    <div class="series-progress">PART @currentPartNumber / @Series.Parts.Count</div>
+    <ol class="series-parts">
+        @foreach (var part in Series.Parts)
+        {
+            <li class="@(part.Slug == CurrentSlug ? "current" : null)">
+                @if (part.Slug == CurrentSlug)
+                {
+                    <span aria-current="page">@part.Title</span>
+                }
+                else
+                {
+                    <a href="/blog/@part.Slug">@part.Title</a>
+                }
+                @if (part.Draft)
+                {
+                    <span class="badge badge-draft">DRAFT</span>
+                }
+            </li>
+        }
+    </ol>
+</aside>
+
+@code {
+    [Parameter, EditorRequired]
+    public PostSeries Series { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string CurrentSlug { get; set; } = string.Empty;
+
+    private int currentPartNumber;
+
+    protected override void OnParametersSet()
+    {
+        currentPartNumber = 0;
+        for (var index = 0; index < Series.Parts.Count; index++)
+        {
+            if (Series.Parts[index].Slug == CurrentSlug)
+            {
+                currentPartNumber = index + 1;
+                break;
+            }
+        }
+    }
+}

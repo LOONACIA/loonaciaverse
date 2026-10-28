@@ -25,11 +25,19 @@
                     }
                 </ul>
             </PageHeader>
+            @if (post.Series is { } series)
+            {
+                <SeriesBox Series="series" CurrentSlug="@post.Meta.Slug" />
+            }
             @if (post.Meta.Cover is { } cover)
             {
                 <img class="post-cover" src="@cover" alt="" />
             }
             <ContentBody Html="@post.Html" />
+            @if (post.Series is { } navigationSeries)
+            {
+                <SeriesNav Series="navigationSeries" CurrentSlug="@post.Meta.Slug" />
+            }
             <a class="all-posts" href="/blog">← ALL POSTS</a>
         </article>
         <TableOfContents Entries="post.Toc" />

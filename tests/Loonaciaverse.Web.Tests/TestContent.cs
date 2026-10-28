@@ -30,6 +30,13 @@ public static class TestContent
 
     public static SeriesDetail Series() => new("first-series", "첫 번째 시리즈", "함께 배우며 기록하는 시리즈입니다.", Posts().OrderBy(post => post.Date).ToArray());
 
+    public static PostSeries PostSeries() => new("learning-series", "함께 배우는 시리즈",
+    [
+        new("series-start", "시리즈의 시작", false),
+        new(Post().Meta.Slug, Post().Meta.Title, Post().Meta.Draft),
+        new("series-finish", "시리즈의 마무리", false)
+    ]);
+
     public static AboutProfile About() => new(
         "루나", "개발자", ["C#", "Blazor", "게임 개발"], "loona@example.com", "https://github.com/example", "https://www.linkedin.com/in/example", "<h2>소개</h2><p>함께 <strong>만듭니다</strong>.</p>");
 

@@ -1,0 +1,45 @@
+@if (previousPart is not null || nextPart is not null)
+{
+    <nav class="series-nav" aria-label="시리즈 이동">
+        @if (previousPart is { } previous)
+        {
+            <a class="series-prev" href="/blog/@previous.Slug">
+                <span class="hud-label">← PREV</span>
+                <span class="series-nav-title">@previous.Title</span>
+            </a>
+        }
+        @if (nextPart is { } next)
+        {
+            <a class="series-next" href="/blog/@next.Slug">
+                <span class="hud-label">NEXT →</span>
+                <span class="series-nav-title">@next.Title</span>
+            </a>
+        }
+    </nav>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public PostSeries Series { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string CurrentSlug { get; set; } = string.Empty;
+
+    private SeriesPart? previousPart;
+    private SeriesPart? nextPart;
+
+    protected override void OnParametersSet()
+    {
+        previousPart = null;
+        nextPart = null;
+        for (var index = 0; index < Series.Parts.Count; index++)
+        {
+            if (Series.Parts[index].Slug == CurrentSlug)
+            {
+                previousPart = index > 0 ? Series.Parts[index - 1] : null;
+                nextPart = index + 1 < Series.Parts.Count ? Series.Parts[index + 1] : null;
+                break;
+            }
+        }
+    }
+}
