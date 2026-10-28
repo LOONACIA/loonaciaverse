@@ -1,0 +1,230 @@
+id: blog-series
+goal: >
+  블로그 시리즈 기능을 구현한다. 완료 상태는 다음과 같다.
+  글 front matter의 `series`와 선택 파일 `content/series.yml`(시리즈 slug·제목·설명)로 시리즈를 정의한다.
+  ContentBuilder가 빌드에 포함된 글로만 시리즈를 구성해(편 순서는 date 오름차순, 같으면 slug 순)
+  `posts/{slug}.json`에 시리즈 정보를, `series/{slug}.json`에 시리즈 페이지 데이터를 쓰고, `sitemap.xml`에 공개된 편이 있는 시리즈 페이지를 넣는다.
+  알 수 없는 시리즈 참조, 시리즈 정의의 필수 필드 누락·형식 오류·slug 중복, 어떤 글(초안 포함)도 참조하지 않는 시리즈는 빌드를 실패시킨다.
+  `/blog/series/{slug}` 페이지가 시리즈 제목, 설명, `PART n`이 붙은 편 목록을 보여 주고, 없는 시리즈는 LOST IN SPACE다.
+  시리즈에 속한 글의 `/blog/{slug}`에는 헤더 아래 시리즈 박스(SERIES, 시리즈 제목 링크, PART n / N, 편 목록)와 본문 아래 PREV·NEXT 링크가 보인다.
+  모든 동작은 xUnit, bUnit 테스트로 검증한다. 실제 `content/`에 시리즈나 글을 추가하는 것은 범위 밖이다.
+approved: true
+max_attempts: 3
+ac_timeout_sec: 900
+steps:
+  - id: s1-series-build-output
+    title: build series data into post details, series pages and the sitemap
+    type: feat
+    scope: builder
+    description: |
+      먼저 읽을 파일: docs/PRD.md ("3. 블로그"의 시리즈 항목, "6." 빌드 검증 항목), docs/ARCHITECTURE.md ("콘텐츠 모델 (Core)", "빌드 산출물" 표),
+      src/Loonaciaverse.Core/Content/Posts.cs, tools/Loonaciaverse.ContentBuilder/PostBuilder.cs, UniverseBuilder.cs (YAML 읽기 방식), SeoBuilder.cs,
+      tests/Loonaciaverse.ContentBuilder.Tests/PostBuilderTests.cs, SeoBuilderTests.cs, ContentTestData.cs, TemporaryDirectory.cs.
+
+      이 스텝은 올바른 입력의 정상 경로만 구현한다. 검증(필수 필드, slug 형식·중복, 알 수 없는 시리즈 참조, 쓰이지 않는 시리즈, YAML 파싱 오류)은
+      추가하지 마라. 이유: s2에서 오류 메시지와 테스트를 함께 추가한다.
+
+      1. `src/Loonaciaverse.Core/Content/Posts.cs`에 record를 추가하고 `PostDetail`을 확장한다.
+         - `public sealed record SeriesPart(string Slug, string Title, bool Draft);`
+         - `public sealed record PostSeries(string Slug, string Title, IReadOnlyList<SeriesPart> Parts);` (Parts는 편 순서)
+         - `public sealed record SeriesDetail(string Slug, string Title, string Summary, IReadOnlyList<PostSummary> Posts);` (Posts는 편 순서)
+         - `PostDetail(PostSummary Meta, string Html, IReadOnlyList<TocEntry> Toc, PostSeries? Series = null)`.
+           기본값 `null`을 꼭 둔다. 이유: Web 테스트와 기존 호출부가 3인자 생성자를 쓴다.
+         - `ContentJson.Options`를 바꾸지 마라. 시리즈가 없는 글의 `series`가 JSON에 null로 써져도 된다. 이유: 옵션을 바꾸면 모든 JSON 출력이 바뀐다.
+      2. `tools/Loonaciaverse.ContentBuilder/SeriesCatalog.cs`(새 파일): `internal static class SeriesCatalog`.
+         - `public static IReadOnlyList<SeriesData> Read(string contentDir)`: `content/series.yml`을 읽는다.
+           파일이 없거나, 비어 있거나, `series` 키가 없으면 빈 목록이다. 파일은 선택이다.
+         - YAML 형태는 최상위 `series` 목록이다. 예:
+           ```yaml
+           series:
+             - slug: unity-build-pipeline
+               title: Unity 빌드 파이프라인
+               summary: 빌드 자동화를 처음부터 정리합니다.
+           ```
+         - 역직렬화는 `UniverseBuilder`와 같은 설정(`CamelCaseNamingConvention`, `IgnoreUnmatchedProperties`)의 YamlDotNet `IDeserializer`를 쓴다.
+           데이터 클래스 `SeriesFile { List<SeriesData?>? Series }`, `SeriesData { Slug, Title, Summary }`(문자열, 기본값 "")는 이 파일 안에 둔다.
+      3. `PostBuilder`:
+         - `PostFrontMatter`에 `public string? Series { get; set; }`를 추가한다. null이면 시리즈에 속하지 않는다.
+         - 빌드에 포함된 글(`includeDrafts`가 false면 초안 제외)만으로 시리즈별 편 목록을 만든다.
+           편 순서는 `Date` 오름차순, 같으면 `Slug` ordinal 오름차순이다.
+         - 시리즈에 속한 글의 `posts/{slug}.json`에는 `PostSeries(시리즈 slug, 시리즈 title, 편 순서대로 SeriesPart(slug, title, draft))`를 넣는다.
+           그래서 글 JSON을 쓰기 전에 포함된 모든 글의 요약이 먼저 필요하다. 루프를 나눠도 된다.
+         - 포함된 편이 하나 이상인 시리즈마다 `content/series/{slug}.json`에 `SeriesDetail(slug, title, summary, 편 순서대로 PostSummary)`를 쓴다.
+           포함된 편이 없는 시리즈는 파일을 쓰지 않는다. 시리즈 파일이 하나도 없으면 `content/series/` 디렉토리를 만들지 않아도 된다.
+         - `posts.json`의 내용과 순서, 기존 글 JSON의 다른 필드는 바꾸지 마라.
+      4. `SeoBuilder.Build`: `content/series/*.json`(디렉토리가 있으면)을 `SeriesDetail`로 읽어, `Draft`가 아닌 편이 하나 이상인 시리즈만
+         `{baseUrl}/blog/series/{slug}`로 sitemap에 넣는다. 위치는 태그 URL 뒤, 순서는 slug ordinal, `lastmod`는 넣지 않는다.
+         RSS(`feed.xml`)와 `robots.txt`는 바꾸지 마라.
+      5. `docs/ARCHITECTURE.md` "콘텐츠 모델 (Core)"의 시리즈 줄에 `series.yml`이 최상위 `series` 목록이라는 것만 덧붙인다. 다른 절은 고치지 마라.
+      6. 테스트:
+         - `ContentTestData.cs`에 `WritePost(string contentDir, string folder, string metadata, string body = "본문입니다.")`와
+           `WriteSeries(string contentDir, string yaml)`을 추가한다(`WriteProject`와 같은 방식). 다른 테스트 클래스의 private `WritePost`는 그대로 둔다.
+         - `tests/Loonaciaverse.ContentBuilder.Tests/SeriesBuilderTests.cs`(`TemporaryDirectory`, `ContentTestData.WriteAbout`/`WriteUniverse`, `ContentBuildRunner.Run`):
+           - 시리즈 두 개와 시리즈 없는 글: 폴더 이름 순서와 다른 날짜, 같은 날짜의 slug 순 정렬로 편 순서를 검증한다.
+             각 편의 글 JSON `Series`(slug, title, Parts의 slug·title·draft)와 `series/{slug}.json`(slug, title, summary, Posts 순서·요약 필드)을 확인한다.
+             시리즈 없는 글의 `Series`는 null이다.
+           - `includeDrafts` false/true(Theory): 초안 편은 false일 때 Parts, `SeriesDetail.Posts`에서 빠지고, true일 때 `Draft = true`로 들어간다.
+             편이 모두 초안인 시리즈는 false일 때 `series/{slug}.json`이 없다.
+           - `series.yml`이 없고 `series` front matter도 없으면 빌드가 성공하고 `series/*.json`이 없다.
+           - sitemap: 공개 편이 있는 시리즈 URL이 태그 URL 뒤에 slug 순으로 있다. `includeDrafts`가 true여도 편이 모두 초안인 시리즈 URL은 없다.
+         - `SeoBuilderTests`, `PostBuilderTests`의 기존 단언을 바꾸지 마라. 시리즈가 없으면 출력이 이전과 같아야 한다.
+
+      Web 프로젝트, `IContentService`, `HttpContentService`를 고치지 마라. 이유: s3에서 시리즈 페이지와 함께 추가한다.
+    expected_files:
+      - src/Loonaciaverse.Core/Content/Posts.cs
+      - tools/Loonaciaverse.ContentBuilder/SeriesCatalog.cs
+      - tools/Loonaciaverse.ContentBuilder/PostBuilder.cs
+      - tools/Loonaciaverse.ContentBuilder/SeoBuilder.cs
+      - docs/ARCHITECTURE.md
+      - tests/Loonaciaverse.ContentBuilder.Tests/ContentTestData.cs
+      - tests/Loonaciaverse.ContentBuilder.Tests/SeriesBuilderTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+    timeout_sec: 2400
+
+  - id: s2-series-validation
+    title: fail the build on unknown, invalid or unused series
+    type: feat
+    scope: builder
+    description: |
+      먼저 읽을 파일: docs/PRD.md ("6."의 시리즈 빌드 실패 조건), tools/Loonaciaverse.ContentBuilder/SeriesCatalog.cs, PostBuilder.cs,
+      ContentValidator.cs, ContentDocuments.cs, UniverseBuilder.cs (`ReadYaml`, `ValidateBodies`의 오류 형식),
+      tests/Loonaciaverse.ContentBuilder.Tests/SeriesBuilderTests.cs, PostValidationTests.cs (`AssertEmptyOutput` 패턴), ContentTestData.cs.
+
+      1. `ContentValidator.ValidateSlug`의 `folderName`을 `string?`로 바꾸고, null이면 폴더 이름 일치 검사만 건너뛴다.
+         글·프로젝트의 기존 동작과 메시지는 바꾸지 마라.
+      2. `SeriesCatalog.Read`를 `public static IReadOnlyList<SeriesData>? Read(string contentDir, List<string> errors)`로 바꾸고 검증을 추가한다.
+         - YAML 파싱 실패(`YamlException`): `series.yml: Invalid YAML: {exception.Message}`를 추가하고 null을 반환한다.
+           null이면 PostBuilder는 아래 참조 검사와 미사용 검사를 건너뛴다. 이유: 정의를 못 읽으면 모든 참조가 거짓 오류가 된다.
+         - 파일이 없거나 비었거나 `series` 키가 없으면 지금처럼 빈 목록이다(오류 아님).
+         - 항목마다 sourcePath는 `series.yml: series[{index}]`다.
+           - 항목이 null(매핑이 아님): `{sourcePath}: Series must be a mapping.`
+           - 시리즈 전용 `ContentValidator` 인스턴스로 `ValidateSlug(sourcePath, null, slug)`, `ValidateRequired(sourcePath, "title", ...)`, `ValidateRequired(sourcePath, "summary", ...)`.
+             시리즈 전용 인스턴스를 쓰는 이유: 시리즈 slug와 글 slug는 URL이 달라(`/blog/series/x`, `/blog/x`) 같아도 된다.
+         - 반환 목록에는 slug가 비어 있지 않은 항목을 모두 넣는다(다른 필드 오류가 있어도). 이유: slug만 맞으면 그 시리즈를 참조하는 글에 거짓 "정의되지 않음" 오류를 내지 않는다.
+      3. `PostBuilder.Build`:
+         - 글을 읽기 전에 `SeriesCatalog.Read`를 호출한다. 글 검증 콜백(`ReadCollection`의 `validate`)에서 `data.Series`가 null이 아니고 정의된 slug(ordinal)가 아니면
+           `{path}: series '{value}' is not defined in series.yml.`를 추가한다. 초안 글도 검사한다.
+         - 콜백에서 참조된 시리즈 slug를 모은다(초안 포함, `includeDrafts`와 무관). 정의된 시리즈 중 어떤 글도 참조하지 않는 slug마다
+           처음 정의된 항목 위치로 `series.yml: series[{index}]: series '{slug}' is not referenced by any post.`를 추가한다.
+         - 모든 오류는 기존처럼 모아서 `BuildResult`로 반환한다. 오류가 있으면 아무것도 쓰지 않는다(기존 `ContentBuildRunner`가 출력을 비운다).
+      4. 테스트 `tests/Loonaciaverse.ContentBuilder.Tests/SeriesValidationTests.cs`(실패 시 `Assert.False(result.Success)`, 정확한 오류 문자열, 출력 없음):
+         - 정의되지 않은 시리즈를 참조하는 글(일반 글과 초안 글 각각, `series.yml`이 없는 경우 포함).
+         - `slug`·`title`·`summary` 누락/빈 값/공백, slug 형식 오류, slug 중복(두 위치가 메시지에 나옴), 매핑이 아닌 항목.
+         - 어떤 글도 참조하지 않는 시리즈. 초안 글만 참조하는 시리즈는 `includeDrafts`가 false여도 성공한다.
+         - 잘못된 YAML(`series: [unclosed`)은 YAML 오류 하나만 내고, 그 시리즈를 참조하는 글에 "정의되지 않음" 오류를 내지 않는다.
+         - 시리즈 slug가 글 slug와 같아도 성공한다.
+         - 여러 오류(글 front matter 오류와 시리즈 오류)를 한 번에 모두 보고한다.
+         - `PostValidationTests`의 기존 오류 개수 단언(`series.yml` 없음)이 그대로 통과해야 한다.
+
+      `PostSeries`, `SeriesDetail` 등 Core 모델과 출력 형식을 바꾸지 마라. 이유: s1에서 확정했고 s3·s4의 Web이 그대로 읽는다.
+    expected_files:
+      - tools/Loonaciaverse.ContentBuilder/SeriesCatalog.cs
+      - tools/Loonaciaverse.ContentBuilder/PostBuilder.cs
+      - tools/Loonaciaverse.ContentBuilder/ContentValidator.cs
+      - tests/Loonaciaverse.ContentBuilder.Tests/SeriesValidationTests.cs
+      - tests/Loonaciaverse.ContentBuilder.Tests/ContentTestData.cs
+    ac:
+      - dotnet build
+      - dotnet test
+
+  - id: s3-series-page
+    title: add the series page at /blog/series/{slug}
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/UX.md ("7. 페이지별"의 블로그 목록·태그 목록·시리즈, "10. HUD 카피"), docs/ARCHITECTURE.md ("콘텐츠 모델 (Core)"의 `IContentService`, "레이어 규칙"),
+      src/Loonaciaverse.Core/Content/IContentService.cs, Posts.cs, src/Loonaciaverse.Web/Services/HttpContentService.cs,
+      src/Loonaciaverse.Web/Pages/BlogList.razor(+ .razor.css, 태그 라우트 구조), Components/PostListItem.razor(+ .razor.css), PageHeader.razor, PageMeta.razor, ContentLoader.razor,
+      tests/Loonaciaverse.Web.Tests/FakeContentService.cs, TestContent.cs, HttpContentServiceTests.cs, BlogListTests.cs.
+
+      1. `IContentService`에 `Task<SeriesDetail?> GetSeriesAsync(string slug, CancellationToken cancellationToken = default);`를 `GetPostAsync` 다음에 추가한다.
+      2. `HttpContentService.GetSeriesAsync`: `GetDetailAsync<SeriesDetail>("series", slug, cancellationToken)`. slug 검사, 404 → null, 그 밖의 오류 전파는 기존 상세와 같다.
+      3. `Components/PostListItem.razor`에 선택 파라미터 `int? Part`를 추가한다. 값이 있으면 `.post-meta` 맨 앞에 `<span class="hud-label post-part">PART {n}</span>`을 둔다.
+         값이 없으면 지금과 같은 마크업이다. 이유: 블로그 목록과 태그 목록은 그대로여야 한다.
+      4. `Pages/BlogSeries.razor`(+ `BlogSeries.razor.css`): `@page "/blog/series/{Slug}"`, `@layout PageLayout`.
+         - `ContentLoader @key="Slug"`로 `GetSeriesAsync(Slug, token)`을 부른다. null이면 ContentLoader 기본 동작(LOST IN SPACE)을 그대로 쓴다.
+           빈 `Posts` 처리를 따로 만들지 마라. 이유: 빌드가 공개된 편이 없는 시리즈 파일을 만들지 않으므로 그런 시리즈는 404(null)다.
+         - `<PageMeta Title="{series.Title} · BLOG" Description="{series.Summary}" />`.
+         - `<section class="blog-page">` 안에 `PageHeader`(`BodyId="blog"`, `Label="SERIES"`, `Title`=시리즈 제목),
+           그 아래 `<p class="series-summary">{Summary}</p>`, 태그 라우트처럼 `<a class="all-posts" href="/blog">전체 글</a>`,
+           그다음 `Posts`를 받은 순서 그대로 `<PostListItem Post=... Part="index + 1" />`로 나열한다. 다시 정렬하지 마라. 이유: 편 순서는 빌드가 정한다.
+         - CSS는 `BlogList.razor.css`의 `.blog-page`, `.all-posts` 규칙을 따라 이 파일에 두고, `.series-summary`는 `--color-text-muted`, `--font-body`다.
+         - 페이지가 `HttpClient`를 직접 쓰지 마라. 이유: ADR-004, 콘텐츠는 `IContentService`로만 읽는다.
+      5. 테스트:
+         - `FakeContentService`: `GetSeriesAsyncHandler`(`Func<string, CancellationToken, Task<SeriesDetail?>>`)와 `SeriesCalls`(`List<(string Slug, CancellationToken Token)>`)를 기존 패턴대로 추가한다.
+         - `TestContent`: `Series()` → `SeriesDetail`(slug `first-series`, 한국어 제목·설명, `Posts`는 기존 `Posts()` 세 개를 날짜 오름차순으로, 초안 하나 포함).
+         - `HttpContentServiceTests`: `ContentCases`에 `{ "series", "content/series/hello-2026.json", SeriesDetail }`와 `Series`가 있는 `PostDetail`의 "post" 행을 추가한다(시리즈 정보 왕복 검증).
+           `InvokeAsync`에 "series"를 추가하고, `InvalidSlugsReturnNullWithoutRequests`, `DetailNotFoundReturnsNull`, `ServerErrorsPropagate`, `CancellationReachesPendingRequests`에 series를 더한다.
+         - `BlogSeriesTests.cs`(bUnit): `SERIES` 라벨과 h1 제목, 설명, `전체 글` 링크(`/blog`), 받은 순서의 편 목록과 `PART 1`·`PART 2`·`PART 3`, 각 편의 제목 링크·날짜, 초안 편 DRAFT 배지.
+           null이면 LOST IN SPACE이고 `SeriesCalls`의 slug가 맞다. 예외 시 SIGNAL LOST, RETRY 후 성공.
+           Slug 파라미터가 바뀌면 다시 로드하고 이전 토큰이 취소된다.
+           `App`으로 `/blog/series/first-series`를 렌더링하면(BlogListTests의 `RoutesRenderWithPageLayoutAndTitle` 방식) `<title>`이 `{제목} · BLOG · LOONACIAVERSE`,
+           `meta[name=description]`이 설명, 상단 바 BLOG 링크가 `aria-current="page"`, RSS 링크가 있다.
+           `Part` 없이 렌더링한 `PostListItem`에는 `.post-part`가 없다.
+
+      `BlogPost.razor`, 글 상세의 시리즈 박스와 이전/다음 링크를 만들지 마라. 이유: s4에서 만든다.
+      ContentBuilder와 Core 모델(`Posts.cs`)을 고치지 마라. 이유: s1·s2에서 확정했다.
+    expected_files:
+      - src/Loonaciaverse.Core/Content/IContentService.cs
+      - src/Loonaciaverse.Web/Services/HttpContentService.cs
+      - src/Loonaciaverse.Web/Components/PostListItem.razor*
+      - src/Loonaciaverse.Web/Pages/BlogSeries.razor*
+      - tests/Loonaciaverse.Web.Tests/FakeContentService.cs
+      - tests/Loonaciaverse.Web.Tests/TestContent.cs
+      - tests/Loonaciaverse.Web.Tests/HttpContentServiceTests.cs
+      - tests/Loonaciaverse.Web.Tests/BlogSeriesTests.cs
+    ac:
+      - dotnet build
+      - dotnet test
+    timeout_sec: 2400
+
+  - id: s4-post-series-box
+    title: show the series box and prev/next links on series posts
+    type: feat
+    scope: web
+    description: |
+      먼저 읽을 파일: docs/UX.md ("7. 페이지별"의 글 상세, "6. 상세 페이지 공통"의 톤·폰트 규칙, "10. HUD 카피"),
+      src/Loonaciaverse.Core/Content/Posts.cs (`PostSeries`, `SeriesPart`), src/Loonaciaverse.Web/Pages/BlogPost.razor, BlogPost.razor.css,
+      Components/TableOfContents.razor.css (패널 스타일 참고), wwwroot/css/app.css (`.hud-label`, `.hud-frame`, `.badge-draft`),
+      tests/Loonaciaverse.Web.Tests/BlogPostTests.cs, TestContent.cs.
+
+      1. `Components/SeriesBox.razor`(+ `.razor.css`): 파라미터 `Series`(`PostSeries`, 필수), `CurrentSlug`(string, 필수).
+         - 루트는 `<aside class="series-box hud-frame" aria-label="시리즈">`다. 첫 클래스는 `series-box`로 둔다.
+         - 안에 `<div class="hud-label">SERIES</div>`, 시리즈 제목 링크 `<a class="series-title" href="/blog/series/{Series.Slug}">`,
+           `<div class="series-progress">PART {현재 편 번호} / {Parts.Count}</div>`(HUD 폰트), 편 목록 `<ol class="series-parts">`를 둔다.
+         - 편 목록은 접지 않는다. 현재 편 `li`에는 `class="current"`를 붙이고 제목은 링크 대신 `<span aria-current="page">`로, 다른 편은 `/blog/{slug}` 링크로 렌더링한다.
+           `Draft`인 편에는 `<span class="badge badge-draft">DRAFT</span>`을 붙인다.
+         - 제목·편 제목은 한국어가 들어가므로 `--font-body`를 쓴다. Michroma, Rajdhani는 `SERIES`, `PART n / N` 같은 영어 라벨·숫자에만 쓴다. 이유: 두 폰트에는 한글 글리프가 없다.
+      2. `Components/SeriesNav.razor`(+ `.razor.css`): 파라미터 `Series`, `CurrentSlug`.
+         - 현재 편의 앞 편이 있으면 `<a class="series-prev" href="/blog/{slug}"><span class="hud-label">← PREV</span><span class="series-nav-title">{제목}</span></a>`,
+           뒤 편이 있으면 같은 구조의 `series-next`(`NEXT →`)를 둔다.
+         - 둘 중 하나라도 있으면 루트 `<nav class="series-nav" aria-label="시리즈 이동">`로 감싸고, 둘 다 없으면(한 편짜리 시리즈) 아무것도 렌더링하지 않는다.
+         - 데스크톱에서는 PREV 왼쪽·NEXT 오른쪽, 모바일에서는 세로로 쌓는다.
+      3. `Pages/BlogPost.razor`: `post.Series`가 있을 때만 `PageHeader` 바로 뒤(커버 이미지 앞)에 `SeriesBox`를, `ContentBody` 뒤(`← ALL POSTS` 앞)에 `SeriesNav`를 둔다.
+         둘 다 `article.blog-post`의 직계 자식이어야 한다. 이유: 이 article은 `display: contents`라 자식이 `.post-layout` grid의 항목이다.
+      4. `BlogPost.razor.css`의 grid 행을 다시 매긴다: page-header 1, series-box 2, post-cover 3, toc-mobile 4, prose 5, series-nav 6, all-posts 7,
+         데스크톱 toc-desktop은 `grid-row: 5 / 8`. 자식 컴포넌트 루트에는 기존처럼 `.post-layout ::deep .series-box` 형태로 지정한다.
+         시리즈가 없는 글의 화면 배치는 지금과 같아야 한다.
+      5. 테스트:
+         - `TestContent`: 세 편짜리 `PostSeries`(두 번째 편은 `Post()`의 slug, 한 편은 초안)를 만드는 헬퍼를 추가한다.
+         - `BlogPostTests.cs`에 추가한다:
+           두 번째 편이면 시리즈 박스에 `SERIES`, 제목 링크(`/blog/series/{slug}`), `PART 2 / 3`, 세 편 제목이 순서대로 있고, 현재 편만 링크가 없고 `aria-current="page"`이며,
+           다른 편 링크 href가 `/blog/{slug}`이고, 초안 편에만 DRAFT 배지가 있다. PREV는 첫 편, NEXT는 세 번째 편의 제목과 href다.
+           첫 편은 PREV가 없고, 마지막 편은 NEXT가 없고, 한 편짜리 시리즈는 `.series-nav`가 없다.
+           시리즈 글의 `article.blog-post` 자식 순서가 page-header, series-box, post-cover, prose, series-nav, all-posts다.
+           `Series`가 null인 글에는 `.series-box`, `.series-nav`가 없다.
+         - 기존 `BlogPostTests`의 단언을 바꾸지 마라.
+
+      Core 모델, ContentBuilder, `BlogSeries.razor`를 고치지 마라. 이유: s1~s3에서 확정했다. 새 HUD 영어 라벨은 UX.md 10절의 `SERIES`, `PART`, `PREV`, `NEXT`만 쓴다.
+    expected_files:
+      - src/Loonaciaverse.Web/Components/SeriesBox.razor*
+      - src/Loonaciaverse.Web/Components/SeriesNav.razor*
+      - src/Loonaciaverse.Web/Pages/BlogPost.razor
+      - src/Loonaciaverse.Web/Pages/BlogPost.razor.css
+      - tests/Loonaciaverse.Web.Tests/BlogPostTests.cs
+      - tests/Loonaciaverse.Web.Tests/TestContent.cs
+    ac:
+      - dotnet build
+      - dotnet test
