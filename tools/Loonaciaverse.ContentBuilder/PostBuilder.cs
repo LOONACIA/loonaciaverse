@@ -17,6 +17,9 @@ public static class PostBuilder
     {
         var postsDir = Path.Combine(contentDir, "posts");
         var errors = new List<string>();
+        var seriesCatalog = SeriesCatalog.Read(contentDir, errors);
+        var definedSeries = seriesCatalog?.Select(series => series.Slug).ToHashSet(StringComparer.Ordinal);
+        var referencedSeries = new HashSet<string>(StringComparer.Ordinal);
         var validator = new ContentValidator();
         var documents = ContentDocuments.ReadCollection<PostFrontMatter>(contentDir, "posts", (path, folder, data) =>
         {
@@ -26,7 +29,23 @@ public static class PostBuilder
             validator.ValidateRequired(path, "summary", data.Summary);
             validator.ValidateTags(path, data.Tags);
             validator.ValidateCover(path, folder, data.Cover);
+            if (data.Series is not null && definedSeries is not null)
+            {
+                referencedSeries.Add(data.Series);
+                if (!definedSeries.Contains(data.Series))
+                {
+                    errors.Add($"{path}: series '{data.Series}' is not defined in series.yml.");
+                }
+            }
         }, errors);
+
+        foreach (var series in (seriesCatalog ?? []).DistinctBy(series => series.Slug, StringComparer.Ordinal))
+        {
+            if (!referencedSeries.Contains(series.Slug))
+            {
+                errors.Add($"series.yml: series[{series.SourceIndex}]: series '{series.Slug}' is not referenced by any post.");
+            }
+        }
 
         errors.AddRange(validator.Errors);
         if (errors.Count > 0)
@@ -34,7 +53,6 @@ public static class PostBuilder
             return new BuildResult(errors);
         }
 
-        var seriesCatalog = SeriesCatalog.Read(contentDir);
         var includedPosts = new List<(FrontMatterDocument<PostFrontMatter> Document, PostSummary Summary)>();
         Directory.CreateDirectory(contentOutputDir);
         foreach (var document in documents)
@@ -53,7 +71,7 @@ public static class PostBuilder
             includedPosts.Add((document, summary));
         }
 
-        var seriesDetails = seriesCatalog.Select(series => new SeriesDetail(series.Slug, series.Title, series.Summary,
+        var seriesDetails = seriesCatalog!.Select(series => new SeriesDetail(series.Slug, series.Title, series.Summary,
             includedPosts.Where(post => post.Document.Data.Series == series.Slug).Select(post => post.Summary)
                 .OrderBy(post => post.Date).ThenBy(post => post.Slug, StringComparer.Ordinal).ToArray())).Where(series => series.Posts.Count > 0).ToArray();
         var postSeries = seriesDetails.ToDictionary(series => series.Slug,

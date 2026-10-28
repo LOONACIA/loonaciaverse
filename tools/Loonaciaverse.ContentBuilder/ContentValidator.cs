@@ -18,7 +18,7 @@ public sealed class ContentValidator
         }
     }
 
-    public void ValidateSlug(string sourcePath, string folderName, string? slug)
+    public void ValidateSlug(string sourcePath, string? folderName, string? slug)
     {
         ValidateRequired(sourcePath, "slug", slug);
         if (string.IsNullOrWhiteSpace(slug))
@@ -31,7 +31,7 @@ public sealed class ContentValidator
             errors.Add($"{sourcePath}: slug '{slug}' must use lowercase letters, digits, and single hyphens between segments.");
         }
 
-        if (!string.Equals(slug, folderName, StringComparison.Ordinal))
+        if (folderName is not null && !string.Equals(slug, folderName, StringComparison.Ordinal))
         {
             errors.Add($"{sourcePath}: slug '{slug}' must match folder name '{folderName}'.");
         }
